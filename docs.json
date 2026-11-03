@@ -1,4 +1,5 @@
 {
+  "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
   "name": "Azipix Pagamentos",
   "colors": {
@@ -15,8 +16,7 @@
     "mdx": {
       "server": "https://api.azipix.com",
       "auth": {
-        "method": "bearer",
-        "name": null
+        "method": "bearer"
       }
     }
   },
