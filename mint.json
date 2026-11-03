@@ -56,16 +56,10 @@
         "webhooks/signature",
         "webhooks/events"
       ]
-    },
-    {
-      "group": "Recursos Avançados",
-      "pages": [
-        "advanced/smart-drops",
-        "advanced/idempotency"
-      ]
     }
   ],
   "footerSocials": {
     "website": "https://azipix.com"
   }
 }
+

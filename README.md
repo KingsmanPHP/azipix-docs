@@ -32,3 +32,4 @@ npx mintlify dev
 - `api-reference/` — Endpoints de Pix, Cartão e consulta.
 - `webhooks/` — Instruções completas para postbacks e Pagar.me.
 - `advanced/` — Motor de Drops e Idempotência.
+
