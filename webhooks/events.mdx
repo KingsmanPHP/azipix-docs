@@ -1,0 +1,37 @@
+---
+title: "Eventos Suportados"
+description: "Catálogo completo de eventos enviados pelo motor de webhooks da Azipix."
+---
+
+| Evento | Descrição |
+| :--- | :--- |
+| `charge.pending` | Cobrança gerada e aguardando pagamento do comprador. |
+| `charge.paid` | Pagamento confirmado com sucesso pela instituição bancária. |
+| `charge.failed` | Transação recusada pela adquirente ou banco emissor. |
+| `charge.refunded` | Cobrança estornada total ou parcialmente. |
+| `withdrawal.approved` | Solicitação de saque aprovada pela equipe de risco. |
+| `withdrawal.paid` | Transferência Pix de saque enviada para a conta bancária do lojista. |
+
+## Exemplo de Payload `charge.paid`
+
+```json
+{
+  "event": "charge.paid",
+  "timestamp": "2026-11-03T18:05:22.000Z",
+  "data": {
+    "id": "tx_9a8f27bc-40d1-4cb5-8d51-118f9c0e2a33",
+    "amountCents": 15000,
+    "feeCents": 178,
+    "netCents": 14822,
+    "status": "paid",
+    "paymentMethod": "pix",
+    "description": "Pedido #10842 - Assinatura Mensal",
+    "customer": {
+      "name": "João da Silva",
+      "email": "joao.silva@exemplo.com.br",
+      "document": "12345678901"
+    },
+    "paidAt": "2026-11-03T18:05:20.000Z"
+  }
+}
+```

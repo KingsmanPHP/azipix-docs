@@ -1,0 +1,38 @@
+---
+title: "Autenticação"
+description: "Aprenda a autenticar suas requisições com segurança usando Bearer Tokens e Chaves de API."
+---
+
+Todas as requisições à API da Azipix requerem autenticação através do cabeçalho HTTP `Authorization`.
+
+## Formato do Cabeçalho
+
+```http
+Authorization: Bearer <SEU_TOKEN_OU_API_KEY>
+```
+
+<Warning>
+  Nunca exponha suas chaves de API secretas em repositórios públicos, código de front-end (navegadores) ou aplicativos móveis. Sempre realize as chamadas a partir do seu servidor backend seguro.
+</Warning>
+
+## Cabeçalhos Recomendados
+
+Para garantir conformidade operacional e proteção contra cobranças duplicadas, envie os seguintes headers:
+
+| Header | Tipo | Obrigatório | Descrição |
+| :--- | :--- | :--- | :--- |
+| `Authorization` | String | **Sim** | `Bearer <SEU_TOKEN>` |
+| `Content-Type` | String | **Sim** | Deve ser `application/json` |
+| `X-Idempotency-Key` | UUID v4 | *Recomendado* | Chave única por transação. Evita pagamentos duplicados em caso de retentativa de rede. |
+
+## Respostas de Erro de Autenticação
+
+Caso o token seja inválido, ausente ou expirado, a API responderá com status HTTP `401 Unauthorized`:
+
+```json
+{
+  "statusCode": 401,
+  "error": "Unauthorized",
+  "message": "Credenciais inválidas ou token expirado."
+}
+```

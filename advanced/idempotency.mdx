@@ -1,0 +1,19 @@
+---
+title: "Idempotência de Requisições"
+description: "Garantia contra pagamentos duplicados causados por timeouts ou retentativas de rede."
+---
+
+A API da Azipix suporta **chaves de idempotência** para permitir que você execute retentativas de requisições de cobrança com segurança, garantindo que o cliente final nunca seja cobrado duas vezes pelo mesmo pedido.
+
+## Como Utilizar
+
+Basta enviar o cabeçalho `X-Idempotency-Key` contendo um identificador único universal (UUID v4) associado ao pedido do seu sistema:
+
+```http
+X-Idempotency-Key: 9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d
+```
+
+### Comportamento da API
+
+1. **Primeira Requisição**: A cobrança é criada normalmente no banco e adquirente, e a resposta é armazenada em cache atômico vinculado à chave.
+2. **Requisições Subsequentes com a mesma Chave**: A API identifica a duplicidade e retorna imediatamente a resposta exata da transação original com status HTTP correspondente, sem chamar a adquirente nem gerar um novo Pix.

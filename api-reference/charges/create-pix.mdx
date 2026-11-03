@@ -1,0 +1,77 @@
+---
+title: "Criar Cobrança Pix"
+api: "POST /api/transactions/charge"
+description: "Gera uma cobrança Pix instantânea com chave e QR Code dinâmicos."
+---
+
+### Corpo da Requisição (Body)
+
+<ParamField body="amountCents" type="integer" required>
+  Valor total da cobrança em **centavos de Real** (ex: `1000` = R$ 10,00).
+</ParamField>
+
+<ParamField body="paymentMethod" type="string" default="pix" required>
+  Deve ser definido como `"pix"`.
+</ParamField>
+
+<ParamField body="customer" type="object" required>
+  Dados cadastrais do cliente pagador.
+  <Expandable title="Propriedades do Cliente">
+    <ParamField body="name" type="string" required>
+      Nome completo do comprador.
+    </ParamField>
+    <ParamField body="email" type="string" required>
+      E-mail válido para envio de recibo.
+    </ParamField>
+    <ParamField body="document" type="string" required>
+      CPF ou CNPJ (apenas dígitos ou formatado).
+    </ParamField>
+    <ParamField body="phone" type="string">
+      Telefone ou celular com DDD (ex: `11987654321`).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="description" type="string">
+  Texto descritivo exibido no comprovante bancário do comprador (máximo de 140 caracteres).
+</ParamField>
+
+---
+
+### Exemplo de Requisição
+
+```bash cURL
+curl --request POST \
+  --url https://api.azipix.com/api/transactions/charge \
+  --header 'Authorization: Bearer <SEU_TOKEN>' \
+  --header 'Content-Type: application/json' \
+  --header 'X-Idempotency-Key: f2b8a71c-34e8-4682-8cbf-9a3e2d6c1b74' \
+  --data '{
+    "amountCents": 2990,
+    "paymentMethod": "pix",
+    "description": "Curso Online de Finanças",
+    "customer": {
+      "name": "Maria Oliveira",
+      "email": "maria@exemplo.com.br",
+      "document": "98765432100",
+      "phone": "21999998888"
+    }
+  }'
+```
+
+### Exemplo de Resposta (201 Created)
+
+```json
+{
+  "id": "tx_8c72bd1a-9f5b-4321-9988-112233445566",
+  "merchantId": "50f1d81c-b800-488d-866c-c69a8bce6447",
+  "amountCents": 2990,
+  "feeCents": 35,
+  "netCents": 2955,
+  "status": "pending",
+  "paymentMethod": "pix",
+  "pixCode": "00020126580014br.gov.bcb.pix0136e9a71f00-0000-0000-0000-000000000000520400005303986540529.905802BR5925AZIPIX PAGAMENTOS LTDA6009SAO PAULO62070503***6304D1B9",
+  "pixQrCodeUrl": "https://api.azipix.com/qr/tx_8c72bd1a",
+  "createdAt": "2026-11-03T18:10:00.000Z"
+}
+```

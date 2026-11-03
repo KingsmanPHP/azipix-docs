@@ -1,0 +1,25 @@
+---
+title: "Motor de Retenção & Smart Drops"
+description: "Mecanismo inteligente de controle de risco, retenção fracionada e blindagem de liquidez."
+---
+
+O **Smart Drops Engine** da Azipix é uma camada proprietária de controle de risco financeiro configurável de forma individual por lojista pelo time de compliance e administração.
+
+## Como Funciona
+
+Quando ativado para um lojista:
+
+1. **Taxa de Drop configurável (%)**: Define a porcentagem estatística de transações a reter temporariamente para validação de esteira.
+2. **Janela Segura de Ticket**: Permite definir um ticket mínimo e máximo que ficam blindados e **nunca sofrem drop**.
+3. **Comportamento da Transação Droppada**:
+   - A cobrança permanece com status contábil `pending` no dashboard do lojista.
+   - O webhook externo para a plataforma de vendas do lojista é suprimido durante a quarentena.
+   - Os fundos são liquidados na conta do lojista assim que a transação for liberada pelo painel administrativo.
+
+## Liberação de Transações em Quarentena
+
+Os administradores da Azipix possuem acesso ao painel de liberação em lote ou individual em:
+
+```text
+Painel Admin > Vendedores > Selecionar Lojista > Aba Motor de Drops > Liberar Venda
+```

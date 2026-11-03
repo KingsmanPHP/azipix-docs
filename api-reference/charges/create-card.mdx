@@ -1,0 +1,46 @@
+---
+title: "Criar Cobrança Cartão"
+api: "POST /api/transactions/charge"
+description: "Processa pagamentos à vista ou parcelados em até 12x via cartão de crédito."
+---
+
+### Corpo da Requisição (Body)
+
+<ParamField body="amountCents" type="integer" required>
+  Valor total da cobrança em **centavos** (ex: `25000` = R$ 250,00).
+</ParamField>
+
+<ParamField body="paymentMethod" type="string" default="credit_card" required>
+  Deve ser definido como `"credit_card"`.
+</ParamField>
+
+<ParamField body="installments" type="integer" default="1">
+  Número de parcelas (entre 1 e 12).
+</ParamField>
+
+<ParamField body="cardToken" type="string" required>
+  Token seguro gerado a partir dos dados do cartão pelo SDK de front-end.
+</ParamField>
+
+<ParamField body="customer" type="object" required>
+  Dados do portador do cartão.
+</ParamField>
+
+---
+
+### Exemplo de Resposta (201 Created)
+
+```json
+{
+  "id": "tx_cc810a9f-3312-4ebc-8821-49fa281b3309",
+  "amountCents": 25000,
+  "feeCents": 872,
+  "netCents": 24128,
+  "status": "paid",
+  "paymentMethod": "credit_card",
+  "installments": 3,
+  "cardBrand": "mastercard",
+  "lastFourDigits": "4242",
+  "createdAt": "2026-11-03T18:15:00.000Z"
+}
+```

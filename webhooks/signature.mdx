@@ -1,0 +1,65 @@
+---
+title: "Validação de Assinatura HMAC"
+description: "Como verificar a autenticidade das notificações de webhook usando HMAC-SHA256."
+---
+
+Para garantir que o webhook realmente foi enviado pela Azipix (e não por um agente malicioso), toda notificação inclui uma assinatura digital no cabeçalho HTTP:
+
+```http
+X-Hub-Signature: sha256=4f63a2389e7e59b20bfa4925df38c5d8009df51543b35a39cb6ff0a2f4370d37
+```
+
+## Como Validar a Assinatura
+
+Você deve calcular o HMAC-SHA256 do corpo bruto (raw body) da requisição utilizando seu **Webhook Secret** e comparar com o valor recebido no cabeçalho.
+
+<CodeGroup>
+
+```javascript Node.js / Express
+import crypto from "crypto";
+
+function verifyWebhook(req, secret) {
+  const signature = req.headers["x-hub-signature"];
+  if (!signature) return false;
+
+  const rawBody = JSON.stringify(req.body);
+  const expectedSignature = "sha256=" + crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+```
+
+```python Python / FastAPI / Flask
+import hmac
+import hashlib
+
+def verify_webhook(raw_body: bytes, signature_header: str, secret: str) -> bool:
+    if not signature_header or not signature_header.startswith("sha256="):
+        return False
+    
+    received_signature = signature_header.replace("sha256=", "")
+    expected_signature = hmac.new(
+        secret.encode("utf-8"),
+        raw_body,
+        hashlib.sha256
+    ).hexdigest()
+    
+    return hmac.compare_digest(received_signature, expected_signature)
+```
+
+```php PHP
+function verifyWebhook($rawPayload, $signatureHeader, $secret) {
+    if (!$signatureHeader) return false;
+
+    $expectedSignature = "sha256=" . hash_hmac("sha256", $rawPayload, $secret);
+    return hash_equals($expectedSignature, $signatureHeader);
+}
+```
+
+</CodeGroup>

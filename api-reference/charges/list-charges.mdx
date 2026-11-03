@@ -1,0 +1,31 @@
+---
+title: "Listar Transações"
+api: "GET /api/transactions"
+description: "Retorna a lista paginada de cobranças geradas na sua conta."
+---
+
+### Exemplo de Requisição
+
+```bash cURL
+curl --request GET \
+  --url https://api.azipix.com/api/transactions \
+  --header 'Authorization: Bearer <SEU_TOKEN>'
+```
+
+### Exemplo de Resposta (200 OK)
+
+```json
+{
+  "total": 1,
+  "data": [
+    {
+      "id": "tx_8c72bd1a-9f5b-4321-9988-112233445566",
+      "amountCents": 2990,
+      "status": "paid",
+      "paymentMethod": "pix",
+      "customerName": "Maria Oliveira",
+      "createdAt": "2026-11-03T18:10:00.000Z"
+    }
+  ]
+}
+```

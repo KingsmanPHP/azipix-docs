@@ -1,0 +1,71 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "Azipix Pagamentos",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.png",
+  "colors": {
+    "primary": "#9255F7",
+    "light": "#B58AFF",
+    "dark": "#8038E8"
+  },
+  "topbarLinks": [
+    {
+      "name": "Painel Azipix",
+      "url": "https://azipix.com"
+    },
+    {
+      "name": "Status da API",
+      "url": "https://api.azipix.com/health"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Acessar Conta",
+    "url": "https://azipix.com/login"
+  },
+  "api": {
+    "baseUrl": "https://api.azipix.com",
+    "auth": {
+      "method": "bearer"
+    }
+  },
+  "navigation": [
+    {
+      "group": "Visão Geral",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "authentication"
+      ]
+    },
+    {
+      "group": "Cobranças (Charges)",
+      "pages": [
+        "api-reference/charges/create-pix",
+        "api-reference/charges/create-card",
+        "api-reference/charges/get-charge",
+        "api-reference/charges/list-charges"
+      ]
+    },
+    {
+      "group": "Webhooks & Notificações",
+      "pages": [
+        "webhooks/overview",
+        "webhooks/signature",
+        "webhooks/events"
+      ]
+    },
+    {
+      "group": "Recursos Avançados",
+      "pages": [
+        "advanced/smart-drops",
+        "advanced/idempotency"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "website": "https://azipix.com"
+  }
+}
