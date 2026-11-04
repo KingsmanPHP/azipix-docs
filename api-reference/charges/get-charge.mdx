@@ -1,41 +1,44 @@
 ---
 title: "Consultar Cobrança"
 api: "GET /api/transactions/{id}"
-description: "Retorna o status atualizado e detalhes contábeis de uma cobrança específica."
+description: "Retorna os dados e o status atual de uma cobrança."
 ---
-
-### Parâmetros de Rota (Path)
 
 <ParamField path="id" type="string" required>
-  O identificador único da transação retornado na criação (ex: `tx_8c72bd1a-9f5b-4321-9988-112233445566`).
+  O `id` retornado na criação (ex.: `tx_8F3A1C9B2D7E4F60`).
 </ParamField>
 
----
-
-### Exemplo de Requisição
-
-```bash cURL
-curl --request GET \
-  --url https://api.azipix.com/api/transactions/tx_8c72bd1a-9f5b-4321-9988-112233445566 \
-  --header 'Authorization: Bearer <SEU_TOKEN>'
+```bash
+curl https://api.azipix.com/api/transactions/tx_8F3A1C9B2D7E4F60 \
+  --header 'x-api-key: ak_live_SUA_CHAVE'
 ```
 
-### Exemplo de Resposta (200 OK)
-
-```json
+<ResponseExample>
+```json 200
 {
-  "id": "tx_8c72bd1a-9f5b-4321-9988-112233445566",
-  "merchantId": "50f1d81c-b800-488d-866c-c69a8bce6447",
-  "amountCents": 2990,
-  "feeCents": 35,
-  "netCents": 2955,
+  "id": "tx_8F3A1C9B2D7E4F60",
   "status": "paid",
+  "amountCents": 15000,
+  "feeCents": 179,
+  "netCents": 14821,
   "paymentMethod": "pix",
-  "provider": "pagarme",
-  "customerName": "Maria Oliveira",
-  "customerEmail": "maria@exemplo.com.br",
-  "createdAt": "2026-11-03T18:10:00.000Z",
-  "paidAt": "2026-11-03T18:11:04.000Z"
+  "installments": 1,
+  "customerName": "João da Silva",
+  "customerEmail": "joao.silva@exemplo.com.br",
+  "customerDocument": "52998224725",
+  "description": "Pedido #10842",
+  "createdAt": "2026-11-04T18:00:00.000Z",
+  "paidAt": "2026-11-04T18:01:12.000Z"
 }
 ```
 
+```json 404
+{ "error": "Transação não encontrada." }
+```
+</ResponseExample>
+
+<Tip>
+  Use esta rota como **plano B** do webhook: se você não recebeu a notificação de um pedido (servidor fora do ar, por exemplo), consulte o status aqui antes de cancelar o pedido.
+</Tip>
+
+Uma cobrança só pode ser consultada pela conta que a criou. Para outras contas, a API responde `403`.

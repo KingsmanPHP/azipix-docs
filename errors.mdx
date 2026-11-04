@@ -1,0 +1,48 @@
+---
+title: "Erros e Limites"
+description: "Códigos de resposta, formato dos erros e limites de uso."
+---
+
+## Formato
+
+```json
+{
+  "statusCode": 400,
+  "error": "Validation failed",
+  "errors": { "customer": ["CPF ou CNPJ inválido"] }
+}
+```
+
+Erros de regra de negócio vêm com a mensagem em `error` ou `message`, prontas para exibir no seu painel interno.
+
+## Códigos
+
+| Status | Quando |
+| :--- | :--- |
+| `200` / `201` | Sucesso. |
+| `400` | Dados inválidos (CPF/CNPJ inválido, valor fora do limite, método não liberado, cartão sem `cardToken`...). |
+| `401` | Chave de API ausente, inválida ou revogada. |
+| `403` | Conta não aprovada (`AccountNotApproved`), bloqueada (`AccountBlocked`) ou recurso de outra conta. |
+| `404` | Cobrança não encontrada. |
+| `429` | Muitas requisições. Aguarde e tente de novo. |
+| `500` | Erro interno. Tente de novo com a **mesma** `X-Idempotency-Key`: se a cobrança já tiver sido criada, você recebe a original. |
+
+## Mensagens frequentes
+
+| Mensagem | O que fazer |
+| :--- | :--- |
+| `Cartão de crédito não está habilitado para sua conta.` | Solicite a liberação ao suporte Azipix. |
+| `Pix está desativado em Integrações.` | Ative o Pix em **Integrações** no painel. |
+| `Envie o cardToken gerado pelo MercadoPago.js` | Tokenize o cartão no navegador. Veja [Cartão](/api-reference/charges/create-card). |
+| `O valor da cobrança precisa ser maior que a tarifa.` | Aumente o valor da cobrança. |
+
+## Limites
+
+| Item | Limite |
+| :--- | :--- |
+| Valor por cobrança | R$ 1,00 a R$ 100.000,00 |
+| Parcelas no cartão | 1 a 12 |
+| Requisições | 100 por minuto por IP |
+| Webhooks cadastrados | 5 URLs |
+| Chaves de API ativas | 10 |
+| Idempotência | 24 horas por chave |

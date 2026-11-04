@@ -1,78 +1,90 @@
 ---
 title: "Criar Cobrança Pix"
 api: "POST /api/transactions/charge"
-description: "Gera uma cobrança Pix instantânea com chave e QR Code dinâmicos."
+description: "Gera um Pix com QR Code e Copia e Cola."
 ---
 
-### Corpo da Requisição (Body)
+### Corpo da requisição
 
-<ParamField body="amountCents" type="integer" required>
-  Valor total da cobrança em **centavos de Real** (ex: `1000` = R$ 10,00).
+<ParamField body="paymentMethod" type="string" required>
+  `"pix"`
 </ParamField>
 
-<ParamField body="paymentMethod" type="string" default="pix" required>
-  Deve ser definido como `"pix"`.
+<ParamField body="amountCents" type="integer" required>
+  Valor em **centavos**. Mínimo `100` (R$ 1,00), máximo `10000000` (R$ 100.000,00). Em vez dele, você pode enviar `amount` em reais (ex.: `150.00`).
 </ParamField>
 
 <ParamField body="customer" type="object" required>
-  Dados cadastrais do cliente pagador.
-  <Expandable title="Propriedades do Cliente">
-    <ParamField body="name" type="string" required>
-      Nome completo do comprador.
-    </ParamField>
-    <ParamField body="email" type="string" required>
-      E-mail válido para envio de recibo.
-    </ParamField>
+  Dados do pagador.
+  <Expandable title="propriedades">
+    <ParamField body="name" type="string" required>Nome completo.</ParamField>
+    <ParamField body="email" type="string" required>E-mail válido.</ParamField>
     <ParamField body="document" type="string" required>
-      CPF ou CNPJ (apenas dígitos ou formatado).
+      CPF ou CNPJ **válido** (com ou sem pontuação). Documentos inválidos são recusados com `400`.
     </ParamField>
-    <ParamField body="phone" type="string">
-      Telefone ou celular com DDD (ex: `11987654321`).
-    </ParamField>
+    <ParamField body="phone" type="string">Telefone com DDD, ex.: `11987654321`.</ParamField>
   </Expandable>
 </ParamField>
 
 <ParamField body="description" type="string">
-  Texto descritivo exibido no comprovante bancário do comprador (máximo de 140 caracteres).
+  Descrição do pedido (até 200 caracteres). Aparece no seu painel e no extrato do adquirente.
 </ParamField>
 
----
+<ParamField header="X-Idempotency-Key" type="string">
+  UUID único por cobrança. Repetir a mesma chave devolve a cobrança original em vez de criar outra.
+</ParamField>
 
-### Exemplo de Requisição
+### Requisição
 
-```bash cURL
+```bash
 curl --request POST \
   --url https://api.azipix.com/api/transactions/charge \
-  --header 'Authorization: Bearer <SEU_TOKEN>' \
+  --header 'x-api-key: ak_live_SUA_CHAVE' \
   --header 'Content-Type: application/json' \
   --header 'X-Idempotency-Key: f2b8a71c-34e8-4682-8cbf-9a3e2d6c1b74' \
   --data '{
     "amountCents": 2990,
     "paymentMethod": "pix",
-    "description": "Curso Online de Finanças",
+    "description": "Curso Online",
     "customer": {
       "name": "Maria Oliveira",
       "email": "maria@exemplo.com.br",
-      "document": "98765432100",
-      "phone": "21999998888"
+      "document": "52998224725"
     }
   }'
 ```
 
-### Exemplo de Resposta (201 Created)
-
-```json
+<ResponseExample>
+```json 201
 {
-  "id": "tx_8c72bd1a-9f5b-4321-9988-112233445566",
-  "merchantId": "50f1d81c-b800-488d-866c-c69a8bce6447",
-  "amountCents": 2990,
-  "feeCents": 35,
-  "netCents": 2955,
+  "id": "tx_1A2B3C4D5E6F7A8B",
   "status": "pending",
+  "amountCents": 2990,
+  "feeCents": 36,
+  "netCents": 2954,
   "paymentMethod": "pix",
-  "pixCode": "00020126580014br.gov.bcb.pix0136e9a71f00-0000-0000-0000-000000000000520400005303986540529.905802BR5925AZIPIX PAGAMENTOS LTDA6009SAO PAULO62070503***6304D1B9",
-  "pixQrCodeUrl": "https://api.azipix.com/qr/tx_8c72bd1a",
-  "createdAt": "2026-11-03T18:10:00.000Z"
+  "installments": 1,
+  "pixCode": "00020101021226...6304ABCD",
+  "pixQrCode": "data:image/png;base64,iVBORw0KGgo...",
+  "createdAt": "2026-11-04T18:10:00.000Z"
 }
 ```
 
+```json 400
+{
+  "statusCode": 400,
+  "error": "Validation failed",
+  "errors": { "customer": ["CPF ou CNPJ inválido"] }
+}
+```
+</ResponseExample>
+
+### Ciclo de vida
+
+| `status` | Significado |
+| :--- | :--- |
+| `pending` | Pix gerado, aguardando pagamento. |
+| `paid` | Pago e confirmado com o adquirente. Você recebe `payment.paid`. |
+| `failed` | Expirou ou foi cancelado no adquirente. Você recebe `payment.failed`. |
+| `refunded` | Estornado. Você recebe `payment.refunded`. |
+| `disputed` | O valor pago divergiu do valor cobrado. A venda fica retida para análise. |

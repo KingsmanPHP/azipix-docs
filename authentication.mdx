@@ -1,39 +1,53 @@
 ---
 title: "Autenticação"
-description: "Aprenda a autenticar suas requisições com segurança usando Bearer Tokens e Chaves de API."
+description: "Como autenticar suas requisições com a chave de API."
 ---
 
-Todas as requisições à API da Azipix requerem autenticação através do cabeçalho HTTP `Authorization`.
-
-## Formato do Cabeçalho
-
-```http
-Authorization: Bearer <SEU_TOKEN_OU_API_KEY>
-```
+Toda requisição precisa da sua **chave de API**. Crie e revogue chaves em **Painel → Integrações → Chaves de API**.
 
 <Warning>
-  Nunca exponha suas chaves de API secretas em repositórios públicos, código de front-end (navegadores) ou aplicativos móveis. Sempre realize as chamadas a partir do seu servidor backend seguro.
+  A chave completa é exibida **uma única vez**, no momento em que é criada. Guarde-a num cofre de segredos (variável de ambiente do seu servidor). Se perder, revogue e crie outra.
 </Warning>
 
-## Cabeçalhos Recomendados
+## Como enviar
 
-Para garantir conformidade operacional e proteção contra cobranças duplicadas, envie os seguintes headers:
+Use um dos dois cabeçalhos (são equivalentes):
 
-| Header | Tipo | Obrigatório | Descrição |
-| :--- | :--- | :--- | :--- |
-| `Authorization` | String | **Sim** | `Bearer <SEU_TOKEN>` |
-| `Content-Type` | String | **Sim** | Deve ser `application/json` |
-| `X-Idempotency-Key` | UUID v4 | *Recomendado* | Chave única por transação. Evita pagamentos duplicados em caso de retentativa de rede. |
+```http
+x-api-key: ak_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
-## Respostas de Erro de Autenticação
+```http
+Authorization: Bearer ak_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
 
-Caso o token seja inválido, ausente ou expirado, a API responderá com status HTTP `401 Unauthorized`:
+## Cabeçalhos
+
+| Header | Obrigatório | Descrição |
+| :--- | :--- | :--- |
+| `x-api-key` ou `Authorization` | **Sim** | Sua chave de API. |
+| `Content-Type` | **Sim** (em POST) | `application/json` |
+| `X-Idempotency-Key` | Recomendado | Um UUID por tentativa de cobrança. Se a mesma requisição for repetida (ex.: timeout de rede), a API devolve a resposta original em vez de criar uma cobrança duplicada. Vale por 24 horas. |
+
+## Boas práticas
+
+- Chame a API **somente do seu backend**.
+- Use uma chave por sistema/integração e revogue as que não usa mais.
+- O painel mostra a data do **último uso** de cada chave, para ajudar a identificar chaves esquecidas.
+- Chaves de API **não** permitem solicitar saques nem gerenciar outras chaves: isso só é feito pelo painel.
+
+## Erros de autenticação
+
+| Status | `error` | Quando acontece |
+| :--- | :--- | :--- |
+| `401` | `Unauthorized` | Chave ausente, inválida ou revogada. |
+| `403` | `AccountNotApproved` | Sua conta ainda não foi aprovada pelo compliance. |
+| `403` | `AccountBlocked` | Conta bloqueada. Fale com o suporte. |
 
 ```json
 {
   "statusCode": 401,
   "error": "Unauthorized",
-  "message": "Credenciais inválidas ou token expirado."
+  "message": "Token de autenticação ou chave de API ausente, inválido ou expirado."
 }
 ```
-

@@ -1,32 +1,42 @@
 ---
-title: "Listar Transações"
+title: "Listar Cobranças"
 api: "GET /api/transactions"
-description: "Retorna a lista paginada de cobranças geradas na sua conta."
+description: "Lista as cobranças da sua conta, das mais recentes para as mais antigas."
 ---
 
-### Exemplo de Requisição
-
-```bash cURL
-curl --request GET \
-  --url https://api.azipix.com/api/transactions \
-  --header 'Authorization: Bearer <SEU_TOKEN>'
+```bash
+curl https://api.azipix.com/api/transactions \
+  --header 'x-api-key: ak_live_SUA_CHAVE'
 ```
 
-### Exemplo de Resposta (200 OK)
-
-```json
+<ResponseExample>
+```json 200
 {
-  "total": 1,
+  "total": 2,
   "data": [
     {
-      "id": "tx_8c72bd1a-9f5b-4321-9988-112233445566",
-      "amountCents": 2990,
+      "id": "tx_8F3A1C9B2D7E4F60",
       "status": "paid",
+      "amountCents": 15000,
+      "netCents": 14821,
       "paymentMethod": "pix",
-      "customerName": "Maria Oliveira",
-      "createdAt": "2026-11-03T18:10:00.000Z"
+      "customerName": "João da Silva",
+      "createdAt": "2026-11-04T18:00:00.000Z",
+      "paidAt": "2026-11-04T18:01:12.000Z"
+    },
+    {
+      "id": "tx_C0FFEE1234ABCD57",
+      "status": "failed",
+      "amountCents": 25000,
+      "paymentMethod": "credit_card",
+      "failureReason": "cc_rejected_insufficient_amount",
+      "createdAt": "2026-11-04T17:40:00.000Z"
     }
   ]
 }
 ```
+</ResponseExample>
 
+<Note>
+  Retorna as últimas 1.000 cobranças. Para conciliar um pedido específico, prefira [Consultar Cobrança](/api-reference/charges/get-charge).
+</Note>

@@ -28,7 +28,8 @@
   "api": {
     "baseUrl": "https://api.azipix.com",
     "auth": {
-      "method": "bearer"
+      "method": "key",
+      "name": "x-api-key"
     }
   },
   "navigation": [
@@ -37,11 +38,12 @@
       "pages": [
         "introduction",
         "quickstart",
-        "authentication"
+        "authentication",
+        "errors"
       ]
     },
     {
-      "group": "Cobranças (Charges)",
+      "group": "Cobranças",
       "pages": [
         "api-reference/charges/create-pix",
         "api-reference/charges/create-card",
@@ -50,7 +52,7 @@
       ]
     },
     {
-      "group": "Webhooks & Notificações",
+      "group": "Webhooks",
       "pages": [
         "webhooks/overview",
         "webhooks/signature",
@@ -62,4 +64,3 @@
     "website": "https://azipix.com"
   }
 }
-

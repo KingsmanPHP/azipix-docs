@@ -1,66 +1,116 @@
 ---
-title: "Validação de Assinatura HMAC"
-description: "Como verificar a autenticidade das notificações de webhook usando HMAC-SHA256."
+title: "Validação da Assinatura"
+description: "Confirme que o webhook veio mesmo da Azipix antes de liberar um pedido."
 ---
 
-Para garantir que o webhook realmente foi enviado pela Azipix (e não por um agente malicioso), toda notificação inclui uma assinatura digital no cabeçalho HTTP:
+Qualquer pessoa que descubra a sua URL pode enviar um `POST` falso para ela. Por isso, **toda chamada é assinada** e você deve validar a assinatura antes de confiar no conteúdo.
 
-```http
-X-Hub-Signature: sha256=4f63a2389e7e59b20bfa4925df38c5d8009df51543b35a39cb6ff0a2f4370d37
+## Cabeçalhos
+
+| Header | Exemplo | Descrição |
+| :--- | :--- | :--- |
+| `X-Azipix-Event` | `payment.paid` | Nome do evento. |
+| `X-Azipix-Timestamp` | `1793833200` | Momento do envio (segundos Unix). |
+| `X-Azipix-Signature` | `sha256=5d2c1f...` | HMAC-SHA256 em hexadecimal. |
+
+## Como a assinatura é calculada
+
+```text
+assinatura = HMAC_SHA256( segredo, timestamp + "." + corpo_bruto )
 ```
 
-## Como Validar a Assinatura
+- `segredo`: o **Segredo** exibido em **Integrações → Webhooks** (começa com `whsec_`).
+- `timestamp`: o valor do cabeçalho `X-Azipix-Timestamp`.
+- `corpo_bruto`: o corpo da requisição **exatamente como recebido** (bytes/texto original). Não use `JSON.stringify(req.body)`: reformatar o JSON muda a assinatura.
 
-Você deve calcular o HMAC-SHA256 do corpo bruto (raw body) da requisição utilizando seu **Webhook Secret** e comparar com o valor recebido no cabeçalho.
+## Passo a passo
+
+1. Leia o corpo bruto da requisição.
+2. Calcule o HMAC-SHA256 de `timestamp + "." + corpo_bruto` com o seu segredo.
+3. Compare com o valor após `sha256=` usando **comparação em tempo constante**.
+4. Recuse se o `timestamp` tiver mais de 5 minutos (proteção contra reenvio).
+5. Só então processe o evento.
 
 <CodeGroup>
 
-```javascript Node.js / Express
-import crypto from "crypto";
+```javascript Node.js (Express)
+import express from "express";
+import crypto from "node:crypto";
 
-function verifyWebhook(req, secret) {
-  const signature = req.headers["x-hub-signature"];
-  if (!signature) return false;
+const app = express();
+const SECRET = process.env.AZIPIX_WEBHOOK_SECRET; // whsec_...
 
-  const rawBody = JSON.stringify(req.body);
-  const expectedSignature = "sha256=" + crypto
-    .createHmac("sha256", secret)
-    .update(rawBody)
+// IMPORTANTE: express.raw para ter o corpo bruto
+app.post("/webhooks/azipix", express.raw({ type: "application/json" }), (req, res) => {
+  const timestamp = req.get("X-Azipix-Timestamp") || "";
+  const received = (req.get("X-Azipix-Signature") || "").replace("sha256=", "");
+
+  const expected = crypto
+    .createHmac("sha256", SECRET)
+    .update(`${timestamp}.${req.body.toString("utf8")}`)
     .digest("hex");
 
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  );
-}
+  const ok =
+    received.length === expected.length &&
+    crypto.timingSafeEqual(Buffer.from(received), Buffer.from(expected)) &&
+    Math.abs(Date.now() / 1000 - Number(timestamp)) < 300;
+
+  if (!ok) return res.status(401).send("assinatura inválida");
+
+  const event = JSON.parse(req.body.toString("utf8"));
+  if (event.event === "payment.paid") {
+    // marque o pedido event.data.id como pago (de forma idempotente)
+  }
+  res.sendStatus(200);
+});
 ```
 
-```python Python / FastAPI / Flask
-import hmac
-import hashlib
+```python Python (Flask)
+import hmac, hashlib, os, time, json
+from flask import Flask, request, abort
 
-def verify_webhook(raw_body: bytes, signature_header: str, secret: str) -> bool:
-    if not signature_header or not signature_header.startswith("sha256="):
-        return False
-    
-    received_signature = signature_header.replace("sha256=", "")
-    expected_signature = hmac.new(
-        secret.encode("utf-8"),
-        raw_body,
-        hashlib.sha256
-    ).hexdigest()
-    
-    return hmac.compare_digest(received_signature, expected_signature)
+app = Flask(__name__)
+SECRET = os.environ["AZIPIX_WEBHOOK_SECRET"].encode()
+
+@app.post("/webhooks/azipix")
+def azipix_webhook():
+    raw = request.get_data()  # corpo bruto (bytes)
+    timestamp = request.headers.get("X-Azipix-Timestamp", "")
+    received = request.headers.get("X-Azipix-Signature", "").removeprefix("sha256=")
+
+    expected = hmac.new(SECRET, f"{timestamp}.".encode() + raw, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(received, expected) or abs(time.time() - int(timestamp or 0)) > 300:
+        abort(401)
+
+    event = json.loads(raw)
+    if event["event"] == "payment.paid":
+        pass  # marque o pedido event["data"]["id"] como pago
+    return "", 200
 ```
 
 ```php PHP
-function verifyWebhook($rawPayload, $signatureHeader, $secret) {
-    if (!$signatureHeader) return false;
+<?php
+$secret    = getenv('AZIPIX_WEBHOOK_SECRET');
+$raw       = file_get_contents('php://input'); // corpo bruto
+$timestamp = $_SERVER['HTTP_X_AZIPIX_TIMESTAMP'] ?? '';
+$received  = str_replace('sha256=', '', $_SERVER['HTTP_X_AZIPIX_SIGNATURE'] ?? '');
 
-    $expectedSignature = "sha256=" . hash_hmac("sha256", $rawPayload, $secret);
-    return hash_equals($expectedSignature, $signatureHeader);
+$expected = hash_hmac('sha256', $timestamp . '.' . $raw, $secret);
+
+if (!hash_equals($expected, $received) || abs(time() - (int)$timestamp) > 300) {
+    http_response_code(401);
+    exit('assinatura inválida');
 }
+
+$event = json_decode($raw, true);
+if ($event['event'] === 'payment.paid') {
+    // marque o pedido $event['data']['id'] como pago
+}
+http_response_code(200);
 ```
 
 </CodeGroup>
 
+<Warning>
+  Nunca coloque o segredo no front-end nem no repositório. Guarde-o como variável de ambiente do seu servidor.
+</Warning>

@@ -1,43 +1,53 @@
 ---
-title: "Introdução à API da Azipix"
-description: "Plataforma de alta performance para intermediação e roteamento de pagamentos Pix, Cartão de Crédito e Boleto."
+title: "Introdução"
+description: "API da Azipix para receber pagamentos via Pix e Cartão de Crédito."
 ---
 
-# Bem-vindo à Azipix Pagamentos
-
-A API da **Azipix** foi projetada para desenvolvedores e empresas que necessitam de liquidação rápida, alta disponibilidade e controle granular sobre rotas e taxas de pagamento.
+A API da **Azipix** permite criar cobranças Pix e de cartão de crédito a partir do seu sistema, consultar o status de cada venda e receber notificações automáticas (webhooks) quando um pagamento é confirmado.
 
 <CardGroup cols={2}>
-  <Card title="Pix Instantâneo" icon="bolt" href="/api-reference/charges/create-pix">
-    Gere QR Codes dinâmicos com confirmação instantânea em milissegundos via WebSocket/Webhook.
+  <Card title="Pix" icon="bolt" href="/api-reference/charges/create-pix">
+    Gere um QR Code e o Pix Copia e Cola. A confirmação chega por webhook segundos depois do pagamento.
   </Card>
   <Card title="Cartão de Crédito" icon="credit-card" href="/api-reference/charges/create-card">
-    Aceite as principais bandeiras nacionais e internacionais com parcelamento em até 12x.
+    À vista ou parcelado em até 12x, com o cartão tokenizado no navegador do comprador.
   </Card>
-  <Card title="Webhooks em Tempo Real" icon="bell" href="/webhooks/overview">
-    Notificações automáticas assinadas digitalmente via HMAC-SHA256 para seu backend.
+  <Card title="Webhooks" icon="bell" href="/webhooks/overview">
+    Notificações assinadas com HMAC-SHA256 quando uma venda é paga, recusada ou estornada.
   </Card>
-  <Card title="Consulta & Conciliação" icon="magnifying-glass" href="/api-reference/charges/get-charge">
-    Consulte status, relatórios contábeis e comprovantes em tempo real.
+  <Card title="Consulta" icon="magnifying-glass" href="/api-reference/charges/get-charge">
+    Consulte o status de qualquer cobrança a qualquer momento.
   </Card>
 </CardGroup>
 
-## Ambientes da API
+## URL base
 
-A Azipix disponibiliza dois ambientes distintos:
+Todas as rotas desta documentação usam a URL base:
 
-| Ambiente | Base URL | Finalidade |
-| :--- | :--- | :--- |
-| **Produção** | `https://api.azipix.com` | Transações bancárias e financeiras reais |
-| **Sandbox / Testes** | `https://api.azipix.com/api` (com header `X-Environment: sandbox`) | Homologação de fluxos sem movimentação de fundos |
+```text
+https://api.azipix.com/api
+```
 
 <Note>
-  Todas as requisições para a API devem ser feitas obrigatoriamente através de HTTPS. Requisições em HTTP puro serão recusadas.
+  Só aceitamos HTTPS. Faça as chamadas **a partir do seu servidor**, nunca do navegador ou de um app: a chave de API dá acesso à sua conta.
 </Note>
 
-## Próximos Passos
+## Antes de começar
 
-1. [Início Rápido (Quickstart)](/quickstart) — Crie sua primeira cobrança Pix em menos de 5 minutos.
-2. [Autenticação](/authentication) — Como gerar e utilizar seus tokens de API.
-3. [Configuração de Webhooks](/webhooks/overview) — Receba postbacks de pagamentos confirmados.
+1. Sua conta precisa estar **aprovada** pelo compliance da Azipix. Enquanto estiver em análise, a API responde `403 AccountNotApproved`.
+2. Os métodos de pagamento (Pix e/ou Cartão) precisam estar **liberados** para a sua conta. Confira em **Integrações** no painel.
+3. Crie uma chave de API em **Integrações → Chaves de API**.
 
+## Próximos passos
+
+<Steps>
+  <Step title="Autenticação">
+    [Como usar sua chave de API](/authentication).
+  </Step>
+  <Step title="Primeira cobrança">
+    [Crie um Pix em 5 minutos](/quickstart).
+  </Step>
+  <Step title="Webhooks">
+    [Receba a confirmação de pagamento no seu servidor](/webhooks/overview).
+  </Step>
+</Steps>

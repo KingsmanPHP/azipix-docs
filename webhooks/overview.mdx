@@ -1,65 +1,81 @@
 ---
-title: "Visão Geral de Webhooks"
-description: "Receba notificações em tempo real no seu servidor quando uma cobrança for paga ou atualizada."
+title: "Visão Geral"
+description: "Receba no seu servidor a confirmação de pagamentos, recusas e estornos."
 ---
 
-Os Webhooks permitem que a sua aplicação seja notificada de forma assíncrona e em tempo real sobre eventos financeiros (por exemplo, quando um Pix é pago pelo cliente ou um cartão é aprovado).
+Um webhook é uma chamada `POST` que a Azipix faz para uma URL do **seu servidor** sempre que uma cobrança muda de status. É assim que você fica sabendo, sem precisar ficar consultando a API, que um Pix foi pago.
 
-## URL do Webhook da Azipix no Pagar.me
+## Configuração
 
-Se você está conectando sua conta da **Pagar.me** (Stone Co. v5) à Azipix, configure a seguinte URL no painel da Pagar.me:
+1. No painel, vá em **Integrações → Webhooks → Adicionar URL**.
+2. Informe uma URL **https** do seu servidor (ex.: `https://sualoja.com/webhooks/azipix`). Você pode cadastrar até 5.
+3. Copie o **Segredo** exibido na mesma tela. Ele serve para [validar a assinatura](/webhooks/signature) de cada chamada.
 
-<Card title="URL de Postback / Webhook para o Pagar.me" icon="link" color="#9255F7">
-  ```text
-  https://api.azipix.com/api/webhooks/pagarme
-  ```
-</Card>
-
-<Note>
-  A Azipix também aceita a rota direta alternativa: `https://api.azipix.com/webhooks/pagarme`. Ambas processam com validação criptográfica HMAC-SHA256.
-</Note>
-
-### Como Configurar no Dashboard da Pagar.me
-
-1. Acesse o **Dashboard da Pagar.me** ([dashboard.pagarme.com](https://dashboard.pagarme.com)).
-2. Navegue até **Configurações** > **Webhooks**.
-3. Clique em **Criar Webhook** (ou **Adicionar URL**).
-4. Insira a URL: `https://api.azipix.com/api/webhooks/pagarme`.
-5. Selecione a versão da API (**v5**).
-6. Marque os eventos que deseja receber:
-   - `order.paid`
-   - `charge.paid`
-   - `charge.payment_failed`
-   - `charge.refunded`
-7. Salve as configurações.
-
----
-
-## Ciclo de Vida do Webhook
+## Como funciona
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Cliente
-    participant Azipix as Gateway Azipix
-    participant Pagarme as Pagar.me / Banco
-    participant Merchant as Seu Backend
+    actor Comprador
+    participant Banco as Banco / Adquirente
+    participant Azipix
+    participant Voce as Seu servidor
 
-    Cliente->>Azipix: Paga o Pix via app bancário
-    Azipix->>Pagarme: Liquidação do Pix
-    Pagarme->>Azipix: POST /api/webhooks/pagarme (x-hub-signature)
-    Note over Azipix: Validação HMAC-SHA256 & Retenção Inteligente (Drops)
-    Azipix->>Merchant: POST https://seu-site.com/webhook (order.paid)
-    Merchant-->>Azipix: HTTP 200 OK
+    Comprador->>Banco: Paga o Pix / cartão
+    Banco->>Azipix: Notifica o pagamento
+    Azipix->>Banco: Confirma o pagamento direto na API do adquirente (e confere o valor)
+    Note over Azipix: Marca a cobrança como paga e credita seu saldo
+    Azipix->>Voce: POST sua URL — evento payment.paid (assinado)
+    Voce-->>Azipix: HTTP 200
 ```
 
-## Política de Retentativas
+A Azipix **só envia `payment.paid` depois de confirmar o pagamento na API do adquirente** e conferir que o valor pago é igual ao valor cobrado. Você pode liberar o pedido com segurança ao receber o evento, desde que a [assinatura seja válida](/webhooks/signature).
 
-Caso seu servidor não responda com status `HTTP 200` em até 10 segundos, a Azipix efetuará retentativas automáticas seguindo um algoritmo de backoff exponencial:
+## O que a sua URL recebe
 
-- **1ª retentativa**: após 1 minuto
-- **2ª retentativa**: após 5 minutos
-- **3ª retentativa**: após 15 minutos
-- **4ª retentativa**: após 1 hora
-- **5ª retentativa**: após 6 horas
+```http
+POST /webhooks/azipix HTTP/1.1
+Content-Type: application/json
+User-Agent: Azipix-Webhooks/1.0
+X-Azipix-Event: payment.paid
+X-Azipix-Timestamp: 1793833200
+X-Azipix-Signature: sha256=5d2c1f0a9e...
+```
 
+```json
+{
+  "event": "payment.paid",
+  "data": {
+    "id": "tx_8F3A1C9B2D7E4F60",
+    "amount": 150,
+    "amountCents": 15000,
+    "feeCents": 179,
+    "netCents": 14821,
+    "paymentMethod": "pix",
+    "status": "paid",
+    "customer": {
+      "name": "João da Silva",
+      "email": "joao.silva@exemplo.com.br",
+      "document": "52998224725"
+    },
+    "paidAt": "2026-11-04T18:01:12.000Z",
+    "createdAt": "2026-11-04T18:00:00.000Z"
+  }
+}
+```
+
+Veja todos os eventos em [Eventos](/webhooks/events).
+
+## Como responder
+
+- Responda **HTTP 2xx em até 8 segundos**. Se o seu processamento for demorado, salve o evento numa fila, responda `200` na hora e processe depois.
+- **Seja idempotente:** use `data.id` + `event` como chave. Se o mesmo evento chegar duas vezes, ignore o segundo.
+- **Não confie só no webhook para cancelar pedidos.** Se uma notificação não chegar (seu servidor fora do ar, por exemplo), consulte `GET /transactions/{id}` antes de cancelar um pedido pendente.
+
+<Warning>
+  Hoje cada evento é enviado **uma vez**. Se a sua URL estiver fora do ar ou demorar mais de 8 segundos, a notificação se perde. Por isso, faça uma conciliação periódica: consulte pela API os pedidos que continuam pendentes.
+</Warning>
+
+## Testando localmente
+
+Para receber webhooks no seu computador, exponha a porta local com um túnel (ngrok, Cloudflare Tunnel) e cadastre a URL `https://` gerada em **Integrações → Webhooks**. Depois, crie uma cobrança Pix de R$ 1,00 e pague.

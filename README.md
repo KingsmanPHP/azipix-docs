@@ -25,11 +25,11 @@ npx mintlify dev
 
 ## Estrutura do Projeto
 
-- `mint.json` — Arquivo principal de configuração, tema, cores (`#9255F7`) e navegação.
+- `docs.json` — Configuração principal (tema, cores `#9255F7`, navegação). `mint.json` é mantido igual para compatibilidade.
 - `introduction.mdx` — Visão geral da plataforma.
 - `quickstart.mdx` — Guia prático de criação de cobranças em 5 minutos.
 - `authentication.mdx` — Padrões de cabeçalho e segurança.
 - `api-reference/` — Endpoints de Pix, Cartão e consulta.
-- `webhooks/` — Instruções completas para postbacks e Pagar.me.
-- `advanced/` — Motor de Drops e Idempotência.
+- `errors.mdx` — Códigos de erro e limites.
+- `webhooks/` — Configuração, validação da assinatura (HMAC) e eventos.
 
