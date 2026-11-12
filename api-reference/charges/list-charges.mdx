@@ -1,12 +1,19 @@
 ---
 title: "Listar Cobranças"
 api: "GET /api/transactions"
-description: "Lista as cobranças da sua conta, das mais recentes para as mais antigas."
+description: "As cobranças da sua conta, das mais recentes para as mais antigas."
 ---
 
+Escopo exigido: `charges:read`.
+
+<ParamField query="subaccount" type="string">
+  Filtra por subconta: o ID de uma subconta sua, `main` (só a conta principal) ou `all` (padrão: tudo). Também pode ir no cabeçalho `X-Subaccount-Id`. Com uma chave vinculada a uma subconta, o filtro é sempre o da chave.
+</ParamField>
+
 ```bash
-curl https://api.azipix.com/api/transactions \
-  --header 'x-api-key: ak_live_SUA_CHAVE'
+curl 'https://api.azipix.com/api/transactions?subaccount=main' \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
 ```
 
 <ResponseExample>
@@ -18,6 +25,7 @@ curl https://api.azipix.com/api/transactions \
       "id": "tx_8F3A1C9B2D7E4F60",
       "status": "paid",
       "amountCents": 15000,
+      "feeCents": 179,
       "netCents": 14821,
       "paymentMethod": "pix",
       "customerName": "João da Silva",
@@ -29,7 +37,7 @@ curl https://api.azipix.com/api/transactions \
       "status": "failed",
       "amountCents": 25000,
       "paymentMethod": "credit_card",
-      "failureReason": "cc_rejected_insufficient_amount",
+      "failureReason": "Saldo ou limite insuficiente.",
       "createdAt": "2026-11-04T17:40:00.000Z"
     }
   ]
@@ -37,6 +45,8 @@ curl https://api.azipix.com/api/transactions \
 ```
 </ResponseExample>
 
+Cada item tem os mesmos campos de [Consultar Cobrança](/api-reference/charges/get-charge).
+
 <Note>
-  Retorna as últimas 1.000 cobranças. Para conciliar um pedido específico, prefira [Consultar Cobrança](/api-reference/charges/get-charge).
+  Retorna as **1.000 cobranças mais recentes**. Para conciliar vendas aprovadas sem perder nenhuma, use o [feed de vendas](/api-reference/charges/feed). Para um pedido específico, prefira [Consultar Cobrança](/api-reference/charges/get-charge).
 </Note>

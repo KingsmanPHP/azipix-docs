@@ -1,30 +1,32 @@
 ---
 title: "Eventos"
-description: "Eventos enviados para o seu webhook."
+description: "Eventos enviados para o seu webhook e o formato de cada um."
 ---
 
-| Evento | Quando é enviado |
-| :--- | :--- |
-| `payment.paid` | O pagamento foi confirmado na API do adquirente e o valor confere. O valor líquido entra no seu saldo (Pix: disponível conforme o prazo da sua conta; cartão: a liberar até o prazo de liquidação). |
-| `payment.failed` | O Pix expirou/foi cancelado, ou o cartão que estava em análise (`processing`) foi recusado. |
-| `payment.refunded` | A venda foi estornada ao comprador. O valor sai do seu saldo. |
+| Evento | Quando é enviado | O que fazer |
+| :--- | :--- | :--- |
+| `payment.paid` | O pagamento foi confirmado na API da adquirente e o valor confere. O líquido entra no seu saldo (disponível ou a liberar, conforme o prazo da sua conta). | Libere o pedido. |
+| `payment.confirmed` | Uma venda que estava em verificação adicional foi confirmada como paga, e o valor entrou no seu saldo. | Trate exatamente como `payment.paid`. |
+| `payment.failed` | O Pix expirou ou foi cancelado, ou o cartão em `processing` (análise ou 3DS) foi recusado. | Cancele ou peça outro meio de pagamento. |
+| `payment.refunded` | A venda foi estornada ao comprador. O valor sai do seu saldo. | Reverta o pedido. |
+| `chargeback.opened` | O comprador abriu um chargeback (cartão) ou uma MED (Pix). O valor fica bloqueado. | Veja o prazo e [envie a defesa](/api-reference/chargebacks/defense). |
+| `chargeback.updated` | A disputa mudou de status (defesa enviada, ganha, perdida, expirada). | Atualize o pedido conforme `data.chargeback.status`. |
 
 <Note>
-  Cartões **aprovados ou recusados na hora** já retornam o status final na própria resposta do `POST /transactions/charge`. Mesmo assim, o `payment.paid` também é enviado para cartões aprovados.
+  Cartões **aprovados ou recusados na hora** já trazem o status final na resposta do `POST /transactions/charge`. Mesmo assim, `payment.paid` também é enviado para cartões aprovados. Para cartões que passaram por 3DS ou análise, o webhook é o aviso do resultado.
 </Note>
 
 ## Formato
 
-Todos os eventos têm o mesmo formato. O `data` traz a cobrança com o status já atualizado:
+Todos os eventos têm o mesmo envelope. `data` traz a venda com o status já atualizado:
 
-<ResponseField name="event" type="string">
-  `payment.paid`, `payment.failed` ou `payment.refunded`.
-</ResponseField>
+<ResponseField name="event" type="string">Nome do evento (o mesmo do cabeçalho `X-Azipix-Event`).</ResponseField>
 
 <ResponseField name="data" type="object">
   <Expandable title="propriedades">
-    <ResponseField name="id" type="string">ID da cobrança (`tx_...`).</ResponseField>
-    <ResponseField name="status" type="string">`paid`, `failed` ou `refunded`.</ResponseField>
+    <ResponseField name="id" type="string">ID da cobrança (`tx_…`).</ResponseField>
+    <ResponseField name="subaccountId" type="string">Subconta da venda, ou `null` na conta principal.</ResponseField>
+    <ResponseField name="status" type="string">`paid`, `failed`, `refunded`… (status atual da venda).</ResponseField>
     <ResponseField name="amount" type="number">Valor em reais.</ResponseField>
     <ResponseField name="amountCents" type="integer">Valor bruto em centavos.</ResponseField>
     <ResponseField name="feeCents" type="integer">Tarifa Azipix em centavos.</ResponseField>
@@ -33,6 +35,9 @@ Todos os eventos têm o mesmo formato. O `data` traz a cobrança com o status j�
     <ResponseField name="customer" type="object">`name`, `email`, `document`.</ResponseField>
     <ResponseField name="paidAt" type="string">Data do pagamento (ISO 8601), quando houver.</ResponseField>
     <ResponseField name="createdAt" type="string">Data de criação (ISO 8601).</ResponseField>
+    <ResponseField name="chargeback" type="object">
+      Só nos eventos `chargeback.*`: `id`, `status` (`open`, `responded`, `won`, `lost`, `expired`), `amountCents`, `reason` e `deadline` (prazo da defesa).
+    </ResponseField>
   </Expandable>
 </ResponseField>
 
@@ -44,6 +49,7 @@ Todos os eventos têm o mesmo formato. O `data` traz a cobrança com o status j�
 {
   "event": "payment.paid",
   "data": {
+    "subaccountId": null,
     "id": "tx_8F3A1C9B2D7E4F60",
     "status": "paid",
     "amount": 150,
@@ -62,6 +68,7 @@ Todos os eventos têm o mesmo formato. O `data` traz a cobrança com o status j�
 {
   "event": "payment.failed",
   "data": {
+    "subaccountId": null,
     "id": "tx_C0FFEE1234ABCD58",
     "status": "failed",
     "amount": 250,
@@ -79,6 +86,7 @@ Todos os eventos têm o mesmo formato. O `data` traz a cobrança com o status j�
 {
   "event": "payment.refunded",
   "data": {
+    "subaccountId": null,
     "id": "tx_8F3A1C9B2D7E4F60",
     "status": "refunded",
     "amount": 150,
@@ -93,4 +101,34 @@ Todos os eventos têm o mesmo formato. O `data` traz a cobrança com o status j�
 }
 ```
 
+```json chargeback.opened
+{
+  "event": "chargeback.opened",
+  "data": {
+    "chargeback": {
+      "id": "e3b0c442-98fc-4c14-9afb-f4c8996fb924",
+      "status": "open",
+      "amountCents": 25000,
+      "reason": "Compra não reconhecida pelo portador",
+      "deadline": "2026-11-12T23:59:59.000Z"
+    },
+    "subaccountId": null,
+    "id": "tx_C0FFEE1234ABCD56",
+    "status": "paid",
+    "amount": 250,
+    "amountCents": 25000,
+    "feeCents": 1871,
+    "netCents": 23129,
+    "paymentMethod": "credit_card",
+    "customer": { "name": "Carlos Eduardo Lima", "email": "carlos@exemplo.com", "document": "52998224725" },
+    "paidAt": "2026-11-04T18:15:02.000Z",
+    "createdAt": "2026-11-04T18:15:00.000Z"
+  }
+}
+```
+
 </CodeGroup>
+
+<Tip>
+  Novos eventos podem ser adicionados no futuro. Ignore (respondendo `200`) os eventos que o seu sistema não conhece.
+</Tip>

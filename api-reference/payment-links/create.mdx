@@ -1,0 +1,96 @@
+---
+title: "Criar Link de Pagamento"
+api: "POST /api/payment-links"
+description: "Um checkout pronto da Azipix para Pix e cartão: você compartilha o link, o comprador paga."
+---
+
+O link abre o checkout da Azipix em `https://azipix.com/pay/{slug}`. O comprador escolhe Pix ou cartão, a Azipix cobra, faz o 3DS quando o banco pede e confirma o pagamento. Você recebe os mesmos webhooks de uma cobrança criada pela API, e nunca toca em dados de cartão.
+
+Exige conta aprovada.
+
+### Corpo da requisição
+
+<ParamField body="title" type="string" required>Nome do produto ou serviço (2 a 120 caracteres).</ParamField>
+
+<ParamField body="amountCents" type="integer" required>Preço em centavos (mínimo `100`).</ParamField>
+
+<ParamField body="paymentMethods" type="string[]" required>
+  `["pix"]`, `["credit_card"]` ou os dois. Só valem os métodos liberados para a sua conta.
+</ParamField>
+
+<ParamField body="description" type="string">Descrição exibida no checkout (até 1.000 caracteres).</ParamField>
+
+<ParamField body="imageUrl" type="string">Foto do produto (URL `https://`).</ParamField>
+
+<ParamField body="allowCustomAmount" type="boolean" default="false">
+  Deixa o comprador digitar o valor (doações, por exemplo). Mínimo R$ 1,00.
+</ParamField>
+
+<ParamField body="maxInstallments" type="integer" default="12">Parcelas máximas no cartão (1 a 12).</ParamField>
+
+<ParamField body="maxPayments" type="integer">Quantos pagamentos o link aceita. Depois disso, ele para de receber.</ParamField>
+
+<ParamField body="expiresAt" type="string">Data e hora de expiração (ISO 8601).</ParamField>
+
+<ParamField body="redirectUrl" type="string">
+  Para onde o comprador vai depois de pagar (URL `https://`). Ele é redirecionado 3 segundos após a confirmação.
+</ParamField>
+
+<ParamField body="theme" type="string" default="dark">`dark`, `light` ou `white`.</ParamField>
+
+<ParamField body="storeName" type="string">Nome da loja exibido no checkout (até 80 caracteres). Padrão: o nome fantasia da conta.</ParamField>
+
+<RequestExample>
+```bash cURL
+curl --request POST \
+  --url https://api.azipix.com/api/payment-links \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "title": "Mentoria Individual",
+    "description": "4 encontros online de 1 hora",
+    "amountCents": 49700,
+    "paymentMethods": ["pix", "credit_card"],
+    "maxInstallments": 6,
+    "redirectUrl": "https://sualoja.com/obrigado"
+  }'
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201
+{
+  "id": "6b1f0e2a-3c4d-4e5f-8a9b-0c1d2e3f4a5b",
+  "slug": "pay_k3x9a1b2c3d4",
+  "title": "Mentoria Individual",
+  "description": "4 encontros online de 1 hora",
+  "amountCents": 49700,
+  "allowCustomAmount": false,
+  "paymentMethods": ["pix", "credit_card"],
+  "maxInstallments": 6,
+  "maxPayments": null,
+  "paymentsCount": 0,
+  "expiresAt": null,
+  "redirectUrl": "https://sualoja.com/obrigado",
+  "status": "active",
+  "theme": "dark",
+  "createdAt": "2026-11-04T18:00:00.000Z",
+  "updatedAt": "2026-11-04T18:00:00.000Z"
+}
+```
+
+```json 400
+{
+  "statusCode": 400,
+  "error": "Dados do link inválidos",
+  "errors": { "paymentMethods": ["Selecione pelo menos um método de pagamento"] }
+}
+```
+</ResponseExample>
+
+Compartilhe `https://azipix.com/pay/{slug}` (no exemplo, `https://azipix.com/pay/pay_k3x9a1b2c3d4`). O `slug` é gerado pela Azipix. Cada pagamento vira uma cobrança comum: aparece em [Listar Cobranças](/api-reference/charges/list-charges), com a descrição `Link de Pagamento: {title}`, e dispara os [webhooks](/webhooks/events).
+
+<Tip>
+  No checkout, o cartão é processado pela conta de cartão da sua loja: tokenizado no navegador ou com 3DS, sem nada a fazer do seu lado.
+</Tip>

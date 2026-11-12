@@ -1,0 +1,67 @@
+---
+title: "Gerenciar Links"
+description: "Listar, consultar, editar, pausar e excluir links de pagamento."
+---
+
+## Listar
+
+`GET /api/payment-links`
+
+<ParamField query="status" type="string">`active` ou `inactive`.</ParamField>
+<ParamField query="search" type="string">Busca pelo título ou pelo `slug`.</ParamField>
+
+```bash
+curl 'https://api.azipix.com/api/payment-links?status=active' \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+```json 200
+{
+  "total": 1,
+  "data": [
+    { "id": "6b1f0e2a-…", "slug": "pay_k3x9a1b2c3d4", "title": "Mentoria Individual", "amountCents": 49700, "status": "active", "paymentsCount": 3 }
+  ]
+}
+```
+
+## Consultar
+
+`GET /api/payment-links/{id}`: devolve o link com os campos de [Criar Link](/api-reference/payment-links/create). Para um link de outra conta, `404`.
+
+## Editar
+
+`PUT /api/payment-links/{id}`: envie só os campos que mudam (os mesmos da criação, mais `status`). Exige conta aprovada.
+
+```bash
+curl --request PUT \
+  --url https://api.azipix.com/api/payment-links/6b1f0e2a-3c4d-4e5f-8a9b-0c1d2e3f4a5b \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA' \
+  --header 'Content-Type: application/json' \
+  --data '{ "amountCents": 39700, "maxInstallments": 3 }'
+```
+
+Mudar o preço não afeta pagamentos já feitos.
+
+## Pausar ou reativar
+
+`PATCH /api/payment-links/{id}/toggle`: alterna entre `active` e `inactive`. Um link inativo mostra "temporariamente desativado" no checkout.
+
+```json 200
+{ "success": true, "status": "inactive", "link": { "id": "6b1f0e2a-…", "status": "inactive" } }
+```
+
+## Excluir
+
+`DELETE /api/payment-links/{id}`
+
+```json 200
+{ "success": true, "message": "Link excluído com sucesso." }
+```
+
+As vendas já feitas pelo link continuam no seu histórico.
+
+## Quando o link para de receber
+
+O checkout recusa novos pagamentos quando o link está inativo, passou de `expiresAt` ou atingiu `maxPayments`. O comprador vê o motivo na tela.

@@ -1,0 +1,103 @@
+---
+title: "Feed de Vendas"
+api: "GET /api/transactions/feed"
+description: "Vendas aprovadas em ordem de confirmação, lidas com cursor: a forma segura de conciliar."
+---
+
+Escopo exigido: `charges:read`.
+
+O feed responde à pergunta "o que foi aprovado depois do meu último ponto?". Diferente de listar as últimas N vendas, ele não perde nenhuma, seja qual for o volume entre duas leituras: 10 vendas num segundo ou milhares enquanto o seu sistema esteve parado.
+
+## Como usar
+
+<Steps>
+  <Step title="Primeira leitura">
+    Chame sem `cursor`. Você recebe as últimas aprovações (mais recentes primeiro) e um `nextCursor`.
+  </Step>
+  <Step title="Leituras seguintes">
+    Chame com `cursor=<nextCursor>`. Você recebe o que foi aprovado depois daquele ponto, das mais antigas para as mais novas.
+  </Step>
+  <Step title="Paginação">
+    Se `hasMore` vier `true`, leia de novo na hora com o novo `nextCursor` e `cont=1`, até `hasMore` ser `false`.
+  </Step>
+  <Step title="Guarde o cursor">
+    Salve o último `nextCursor` (no banco, por exemplo) e use na próxima rodada.
+  </Step>
+</Steps>
+
+## Parâmetros
+
+<ParamField query="cursor" type="string">
+  O `nextCursor` da leitura anterior. Trate como texto opaco: não interprete nem altere.
+</ParamField>
+<ParamField query="cont" type="string">
+  `1` para continuar uma paginação (quando a leitura anterior teve `hasMore: true`).
+</ParamField>
+<ParamField query="limit" type="integer" default="200">Itens por página nas leituras com cursor (máximo 500).</ParamField>
+<ParamField query="tail" type="integer" default="50">Quantas aprovações recentes trazer na primeira leitura, sem cursor (máximo 200).</ParamField>
+<ParamField query="maxAge" type="integer">
+  Milissegundos. Se o seu cursor for mais antigo que isso, a leitura começa em "agora − maxAge" (o que é mais antigo vira histórico). Útil para um sistema que ficou muito tempo parado.
+</ParamField>
+<ParamField query="subaccount" type="string">Filtro de subconta, como em [Listar Cobranças](/api-reference/charges/list-charges).</ParamField>
+
+## Resposta
+
+```json 200
+{
+  "data": [
+    {
+      "id": "tx_8F3A1C9B2D7E4F60",
+      "status": "paid",
+      "amountCents": 15000,
+      "feeCents": 179,
+      "paymentMethod": "pix",
+      "customerName": "João da Silva",
+      "subaccountId": null,
+      "paidAt": "2026-11-04T18:01:12.482915+00:00",
+      "createdAt": "2026-11-04T18:00:00.000Z"
+    }
+  ],
+  "nextCursor": "2026-11-04T18:01:12.482915+00:00|9b2f4c1e-0d6a-4f3b-8e7c-1a2b3c4d5e6f",
+  "hasMore": false,
+  "order": "after",
+  "serverTime": "2026-11-04T18:02:00.000Z"
+}
+```
+
+<ResponseField name="data" type="array">Vendas aprovadas (versão enxuta: sem código Pix e sem dados do pagador). Busque detalhes em [Consultar Cobrança](/api-reference/charges/get-charge).</ResponseField>
+<ResponseField name="nextCursor" type="string">Envie como `cursor` na próxima leitura. Nunca vem vazio.</ResponseField>
+<ResponseField name="hasMore" type="boolean">Há mais vendas esperando depois de `nextCursor`: leia de novo na hora com `cont=1`.</ResponseField>
+<ResponseField name="order" type="string">`tail` (primeira leitura, mais recentes primeiro) ou `after` (depois do cursor, mais antigas primeiro).</ResponseField>
+<ResponseField name="serverTime" type="string">Hora do servidor na leitura.</ResponseField>
+<ResponseField name="clamped" type="boolean">Presente e `true` quando o cursor era mais antigo que `maxAge` e a leitura começou em "agora − maxAge".</ResponseField>
+
+<Warning>
+  Para não perder nenhuma confirmação, a **primeira página** de cada leitura recomeça 30 segundos antes do cursor. Por isso uma venda já entregue pode vir de novo: **descarte pelo `id`** as vendas que você já processou.
+</Warning>
+
+Um `cursor` alterado ou inválido responde `400 Cursor inválido.`.
+
+## Exemplo de conciliação
+
+```javascript
+async function conciliar(db) {
+  let cursor = await db.get("azipix_feed_cursor"); // undefined na primeira vez
+  let cont = false;
+  do {
+    const url = new URL("https://api.azipix.com/api/transactions/feed");
+    if (cursor) url.searchParams.set("cursor", cursor);
+    if (cont) url.searchParams.set("cont", "1");
+    const page = await fetch(url, {
+      headers: { "x-api-key": process.env.AZIPIX_KEY_ID, "x-api-secret": process.env.AZIPIX_SECRET_KEY },
+    }).then((r) => r.json());
+
+    for (const venda of page.data) {
+      if (await db.jaProcessada(venda.id)) continue; // dedupe por id
+      await db.marcarPedidoComoPago(venda.id);
+    }
+    cursor = page.nextCursor;
+    cont = page.hasMore;
+  } while (cont);
+  await db.set("azipix_feed_cursor", cursor);
+}
+```

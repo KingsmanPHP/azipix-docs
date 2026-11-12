@@ -1,0 +1,62 @@
+---
+title: "Idempotência"
+description: "Repita uma requisição sem risco de cobrar duas vezes."
+---
+
+Redes falham: um timeout não diz se a cobrança foi criada. Com o cabeçalho `X-Idempotency-Key`, você pode repetir a **mesma** requisição com segurança: a Azipix devolve a resposta original em vez de criar outra cobrança.
+
+```http
+X-Idempotency-Key: 6f1c2a90-3b1e-4f0e-9d4a-0b7c5e2f8a11
+```
+
+## Regras
+
+- Use um valor único por **tentativa de cobrança** (um UUID v4, por exemplo), com até 150 caracteres.
+- A chave vale por **24 horas** e é separada por conta e por rota.
+- Repetir a chave com o **mesmo corpo** devolve a resposta original, com o cabeçalho `X-Idempotent-Replay: true`.
+- Repetir a chave com um **corpo diferente** é recusado: gere uma chave nova para uma cobrança nova.
+- Se a primeira requisição terminou em erro, a chave é liberada e você pode tentar de novo com ela.
+
+Funciona em `POST /transactions/charge` e em `POST /withdrawals`. No [saque pela API](/api-reference/balance/request-withdrawal) o cabeçalho é **obrigatório** (`400 IdempotencyKeyRequired` sem ele): um timeout nunca vira dois saques.
+
+## Respostas especiais
+
+| Status | `error` | O que significa | O que fazer |
+| :--- | :--- | :--- | :--- |
+| `409` | `IdempotencyInProgress` | Uma requisição idêntica ainda está sendo processada. | Aguarde alguns segundos e repita (ou consulte a cobrança). |
+| `422` | `IdempotencyKeyReused` | A chave já foi usada com outro conteúdo. | Gere uma chave nova. |
+| `503` | `IdempotencyUnavailable` | Não conseguimos registrar a chave agora. Nada foi cobrado. | Tente de novo em instantes. |
+
+## Exemplo de repetição segura
+
+```javascript
+async function criarCobranca(payload) {
+  const key = crypto.randomUUID(); // uma chave por tentativa de cobrança
+  for (let tentativa = 1; tentativa <= 3; tentativa++) {
+    try {
+      const res = await fetch("https://api.azipix.com/api/transactions/charge", {
+        method: "POST",
+        headers: {
+          "x-api-key": process.env.AZIPIX_KEY_ID,
+          "x-api-secret": process.env.AZIPIX_SECRET_KEY,
+          "Content-Type": "application/json",
+          "X-Idempotency-Key": key, // a MESMA chave em todas as repetições
+        },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (res.status === 409) {
+        await new Promise((r) => setTimeout(r, 2000 * tentativa));
+        continue;
+      }
+      return await res.json();
+    } catch (erroDeRede) {
+      if (tentativa === 3) throw erroDeRede;
+    }
+  }
+}
+```
+
+<Warning>
+  Não gere uma chave nova a cada repetição: assim a proteção se perde e o comprador pode receber duas cobranças.
+</Warning>

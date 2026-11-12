@@ -1,0 +1,78 @@
+---
+title: "Métodos e contas liberadas"
+api: "GET /api/transactions/routing"
+description: "Quais métodos de pagamento estão ativos e quais contas de recebimento processam cada um."
+---
+
+Qualquer chave válida pode consultar. Use para:
+
+- saber se Pix e cartão estão liberados e ativos antes de mostrar as opções no seu checkout;
+- descobrir **como enviar o cartão** (token ou cartão + 3DS) — veja [Cartão](/api-reference/charges/create-card);
+- obter a `publicKey` para tokenizar cartões no navegador (contas Mercado Pago).
+
+```bash
+curl https://api.azipix.com/api/transactions/routing \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+<ResponseExample>
+```json 200
+{
+  "routing": {
+    "pixProvider": "acc_7d1e…",
+    "cardProvider": "acc_2b9c…",
+    "pixEnabled": true,
+    "cardEnabled": true,
+    "boletoEnabled": false,
+    "allowedPaymentMethods": ["pix", "credit_card"],
+    "allowedAccountIds": ["acc_7d1e…", "acc_2b9c…"],
+    "webhooks": [
+      { "url": "https://sualoja.com/webhooks/azipix", "events": "payment.paid", "status": "ativo" }
+    ]
+  },
+  "accounts": [
+    {
+      "id": "acc_7d1e…",
+      "provider": "zendry",
+      "providerLabel": "Zendry",
+      "name": "Conta Pix",
+      "environment": "production",
+      "status": "active",
+      "supportedMethods": ["pix", "credit_card"],
+      "publicKey": null
+    },
+    {
+      "id": "acc_2b9c…",
+      "provider": "mercadopago",
+      "providerLabel": "Mercado Pago",
+      "name": "Conta Cartão",
+      "environment": "production",
+      "status": "active",
+      "supportedMethods": ["pix", "credit_card"],
+      "publicKey": "APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+    }
+  ],
+  "webhookSecret": "whsec_••••••••••••••••••••••••••••••••••••••••"
+}
+```
+</ResponseExample>
+
+## Campos
+
+<ResponseField name="routing.allowedPaymentMethods" type="string[]">Métodos liberados pela Azipix para a sua conta.</ResponseField>
+<ResponseField name="routing.pixEnabled" type="boolean">Pix ativo em **Integrações**. Desativado, a criação de Pix é recusada.</ResponseField>
+<ResponseField name="routing.cardEnabled" type="boolean">Cartão ativo em **Integrações**.</ResponseField>
+<ResponseField name="routing.pixProvider" type="string">Conta escolhida para processar Pix (pode vir como `provedor:id`).</ResponseField>
+<ResponseField name="routing.cardProvider" type="string">Conta escolhida para processar cartão (pode vir como `provedor:id`).</ResponseField>
+<ResponseField name="accounts" type="object[]">Contas de recebimento liberadas para você, com os métodos que cada uma processa.</ResponseField>
+<ResponseField name="accounts[].provider" type="string">
+  Quem processa. Para cartão, define o fluxo: `mercadopago` (token no navegador) ou `zendry` (cartão + 3DS).
+</ResponseField>
+<ResponseField name="accounts[].environment" type="string">`production` ou `sandbox`. Chaves de teste só usam contas `sandbox`.</ResponseField>
+<ResponseField name="accounts[].publicKey" type="string">Chave pública para tokenizar cartões (só contas Mercado Pago). É pública por natureza.</ResponseField>
+<ResponseField name="webhookSecret" type="string">Segredo `whsec_…` para validar a [assinatura dos webhooks](/webhooks/signature) da conta principal.</ResponseField>
+
+<Note>
+  Os exemplos de `provider` são ilustrativos: a lista de contas depende do que a Azipix liberou para a sua loja. A escolha de qual conta processa cada método é feita em **Integrações** no painel.
+</Note>

@@ -1,0 +1,63 @@
+---
+title: "Extrato"
+api: "GET /api/withdrawals/statement"
+description: "Cada movimentação do seu saldo, com origem, referência e data."
+---
+
+Escopo exigido: `balance:read`.
+
+<ParamField query="limit" type="integer" default="100">Movimentações por página (máximo 500).</ParamField>
+<ParamField query="before" type="integer">Paginação: traga as movimentações com `id` menor que este (use o `id` da última da página anterior).</ParamField>
+<ParamField query="subaccount" type="string">ID de uma subconta, `main` ou `all`.</ParamField>
+
+```bash
+curl 'https://api.azipix.com/api/withdrawals/statement?limit=50' \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+<ResponseExample>
+```json 200
+{
+  "data": [
+    {
+      "id": 90412,
+      "subaccountId": null,
+      "bucket": "available",
+      "amountCents": -10367,
+      "kind": "withdrawal",
+      "referenceType": "withdrawal",
+      "referenceId": "a1b2c3d4-…",
+      "availableAt": "2026-11-04T19:00:00.000Z",
+      "description": "Saque Pix",
+      "createdAt": "2026-11-04T19:00:00.000Z"
+    },
+    {
+      "id": 90398,
+      "subaccountId": null,
+      "bucket": "pending",
+      "amountCents": 14821,
+      "kind": "sale",
+      "referenceType": "transaction",
+      "referenceId": "tx_8F3A1C9B2D7E4F60",
+      "availableAt": "2026-12-04T18:01:12.000Z",
+      "description": "Venda tx_8F3A1C9B2D7E4F60",
+      "createdAt": "2026-11-04T18:01:12.000Z"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+<ResponseField name="id" type="integer">Identificador sequencial (mais recente primeiro). Use em `before` para paginar.</ResponseField>
+<ResponseField name="bucket" type="string">Onde a movimentação entra: `available` (disponível), `pending` (a liberar) ou `blocked` (bloqueado).</ResponseField>
+<ResponseField name="amountCents" type="integer">Valor com sinal: positivo entra, negativo sai.</ResponseField>
+<ResponseField name="kind" type="string">Tipo da movimentação: venda, tarifa, saque, chargeback, estorno e outros.</ResponseField>
+<ResponseField name="referenceType" type="string">O que originou a movimentação (`transaction`, `withdrawal`, `chargeback`…).</ResponseField>
+<ResponseField name="referenceId" type="string">ID do que originou (ex.: o `tx_…` da venda).</ResponseField>
+<ResponseField name="availableAt" type="string">Quando o valor fica disponível (vendas a liberar).</ResponseField>
+<ResponseField name="description" type="string">Descrição legível.</ResponseField>
+
+<Note>
+  Os valores de `kind` e `description` dos exemplos são ilustrativos. Trate `kind` como informativo e use `bucket`, `amountCents` e `referenceId` na conciliação.
+</Note>

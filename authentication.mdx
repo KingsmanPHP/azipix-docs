@@ -1,48 +1,106 @@
 ---
 title: "Autenticação"
-description: "Como autenticar suas requisições com a chave de API."
+description: "Credenciais de API, escopos, ambientes e boas práticas."
 ---
 
-Toda requisição precisa da sua **chave de API**. Crie e revogue chaves em **Painel → Integrações → Chaves de API**.
+Cada integração usa um **par de credenciais**, criado em **Painel → Integrações → Chaves de API**:
+
+| Credencial | Formato | O que é |
+| :--- | :--- | :--- |
+| ID da chave | `pk_live_…` (produção) · `pk_test_…` (testes) | Identificador público. Pode aparecer em logs. |
+| Chave secreta | `sk_live_…` (produção) · `sk_test_…` (testes) | Senha da integração. **Mostrada uma única vez**, na criação. Guardamos só um hash dela. |
 
 <Warning>
-  A chave completa é exibida **uma única vez**, no momento em que é criada. Guarde-a num cofre de segredos (variável de ambiente do seu servidor). Se perder, revogue e crie outra.
+  Guarde a chave secreta num cofre de segredos ou numa variável de ambiente do servidor. Nunca a coloque no front-end, num app ou no repositório. Se ela vazar, revogue no painel e crie outra.
 </Warning>
 
 ## Como enviar
 
-Use um dos dois cabeçalhos (são equivalentes):
+Escolha **uma** das formas abaixo. Todas são equivalentes.
 
-```http
-x-api-key: ak_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+<CodeGroup>
+
+```http ID + segredo (recomendado)
+x-api-key: pk_live_3f9a1c0d2b7e4f6a8c1d
+x-api-secret: sk_live_••••••••••••••••••••••••••••••••••••••••••
 ```
 
-```http
-Authorization: Bearer ak_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```http Bearer
+Authorization: Bearer sk_live_••••••••••••••••••••••••••••••••••••••••••
 ```
 
-## Cabeçalhos
+```http Basic
+Authorization: Basic base64("pk_live_3f9a1c0d2b7e4f6a8c1d:sk_live_••••")
+```
 
-| Header | Obrigatório | Descrição |
-| :--- | :--- | :--- |
-| `x-api-key` ou `Authorization` | **Sim** | Sua chave de API. |
-| `Content-Type` | **Sim** (em POST) | `application/json` |
-| `X-Idempotency-Key` | Recomendado | Um UUID por tentativa de cobrança. Se a mesma requisição for repetida (ex.: timeout de rede), a API devolve a resposta original em vez de criar uma cobrança duplicada. Vale por 24 horas. |
+```http Só o segredo
+x-api-key: sk_live_••••••••••••••••••••••••••••••••••••••••••
+```
 
-## Boas práticas
+</CodeGroup>
 
-- Chame a API **somente do seu backend**.
-- Use uma chave por sistema/integração e revogue as que não usa mais.
-- O painel mostra a data do **último uso** de cada chave, para ajudar a identificar chaves esquecidas.
-- Chaves de API **não** permitem solicitar saques nem gerenciar outras chaves: isso só é feito pelo painel.
+<Tip>
+  No playground desta documentação, cole a **chave secreta** (`sk_live_…` ou `sk_test_…`) no campo `x-api-key`.
+</Tip>
+
+Chaves no formato antigo (`ak_live_…`) continuam funcionando até serem revogadas, com todos os escopos **exceto** o de saque (`withdrawals:write`). Para novas integrações, use o par `pk_` / `sk_`.
+
+## Escopos
+
+Cada chave tem uma lista de escopos. Uma rota fora dos escopos da chave responde `403 InsufficientScope`.
+
+| Escopo | Libera | Padrão |
+| :--- | :--- | :---: |
+| `charges:write` | Criar cobranças (`POST /transactions/charge`) | Sim |
+| `charges:read` | Consultar cobranças, comprovantes, feed, métricas e análises | Sim |
+| `balance:read` | Saldo, extrato, lista e consulta de saques, destinos de saque | Sim |
+| `chargebacks:read` | Consultar chargebacks e MED | Não |
+| `chargebacks:write` | Enviar e remover documentos e a defesa de chargebacks | Não |
+| `withdrawals:write` | [Solicitar saques](/api-reference/balance/request-withdrawal): Pix para a chave Banking da conta e USDT para carteiras cadastradas no painel | Não |
+
+Crie chaves com o mínimo necessário: um sistema que só concilia vendas precisa apenas de `charges:read`.
+
+<Warning>
+  `withdrawals:write` move dinheiro. Ele só existe em chave de **produção** da **conta inteira** (sem subconta), e criar ou rotacionar uma chave com ele pede a **senha da conta** no painel. Mesmo assim, a chave nunca cadastra destinos: só usa a chave Banking validada e as carteiras USDT que o titular cadastrou no painel.
+</Warning>
+
+## Ambientes
+
+O prefixo da chave define o ambiente:
+
+- `pk_live_` / `sk_live_`: **produção**. As cobranças vão para as contas de recebimento reais.
+- `pk_test_` / `sk_test_`: **testes (sandbox)**. As cobranças vão **apenas** para contas de recebimento de teste liberadas para você. Sem nenhuma, a API recusa a cobrança com uma mensagem explicando o motivo.
+
+Veja [Ambientes e testes](/environments).
+
+## Chave vinculada a uma subconta
+
+Ao criar a chave, você pode vinculá-la a uma [subconta](/api-reference/account/subaccounts). Uma chave vinculada:
+
+- cria cobranças sempre **dentro da subconta**;
+- só enxerga vendas, saldo e chargebacks daquela subconta;
+- para de funcionar se a subconta for desativada ou bloqueada.
+
+## Rotação sem parar a integração
+
+Em **Chaves de API → Rotacionar**, a Azipix cria um novo segredo com o mesmo nome, escopos e vínculo, e mantém o antigo válido por um período de carência (até 7 dias, ou zero para revogar na hora). Troque o segredo no seu servidor dentro desse prazo.
+
+O painel mostra a data e o IP do **último uso** de cada chave, para você identificar chaves esquecidas.
+
+## Limites
+
+- Até **20 chaves ativas** por conta.
+- Até **300 requisições por minuto por chave**. Veja [Erros e limites](/errors).
 
 ## Erros de autenticação
 
 | Status | `error` | Quando acontece |
 | :--- | :--- | :--- |
-| `401` | `Unauthorized` | Chave ausente, inválida ou revogada. |
-| `403` | `AccountNotApproved` | Sua conta ainda não foi aprovada pelo compliance. |
+| `401` | `Unauthorized` | Credencial ausente, inválida, expirada ou revogada. |
+| `403` | `AccountNotApproved` | A conta ainda não foi aprovada pelo compliance. |
 | `403` | `AccountBlocked` | Conta bloqueada. Fale com o suporte. |
+| `403` | `InsufficientScope` | A chave não tem o escopo exigido pela rota. |
+| `403` | `SessionRequired` | A operação só pode ser feita pelo painel (ex.: criar subconta, cadastrar carteira USDT). |
 
 ```json
 {

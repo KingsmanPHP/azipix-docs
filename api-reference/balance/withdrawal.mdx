@@ -1,0 +1,73 @@
+---
+title: "Consultar saque"
+api: "GET /api/withdrawals/{id}"
+description: "Status, valores e, no USDT, a cotação, a taxa e a transação na blockchain."
+---
+
+Escopo exigido: `balance:read`.
+
+<ParamField path="id" type="string" required>
+  O `id` devolvido por [Solicitar saque](/api-reference/balance/request-withdrawal) ou pela lista de saques. Saques de outras contas respondem `404`.
+</ParamField>
+
+```bash
+curl https://api.azipix.com/api/withdrawals/c0ffee00-1d2c-4b3a-8e9f-0a1b2c3d4e5f \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+<ResponseExample>
+```json 200 USDT pago
+{
+  "data": {
+    "id": "c0ffee00-1d2c-4b3a-8e9f-0a1b2c3d4e5f",
+    "amountCents": 50000,
+    "feeCents": 367,
+    "netCents": 49633,
+    "pixKeyType": "usdt_trc20",
+    "pixKey": "TR7NHq…jLj6t",
+    "maskedPixKey": "TR7NHq…jLj6t",
+    "destination": "crypto_wallet",
+    "crypto": {
+      "walletId": "6f0a2c1e-8b4d-4c7a-9e21-3d5b7f9a1c02",
+      "network": "trc20",
+      "networkLabel": "TRON (TRC20)",
+      "usdtAmountMinor": 9100000,
+      "usdtFeeMinor": 1000000,
+      "rate": 5.45,
+      "txHash": "a1b2c3d4e5f6…",
+      "txUrl": "https://tronscan.org/#/transaction/a1b2c3d4e5f6…"
+    },
+    "requestedVia": "api",
+    "status": "paid",
+    "payoutMode": "auto",
+    "trigger": "manual",
+    "requestedAt": "2026-11-11T15:02:11.000Z",
+    "paidAt": "2026-11-11T15:04:37.000Z",
+    "payoutReference": "a1b2c3d4e5f6…"
+  }
+}
+```
+</ResponseExample>
+
+## Campos do USDT
+
+<ResponseField name="crypto.network" type="string">Rede da carteira: `trc20`, `polygon`, `bep20` ou `erc20`.</ResponseField>
+<ResponseField name="crypto.usdtAmountMinor" type="integer">USDT que chegou à carteira, com 6 casas (`9100000` = 9,10 USDT). Preenchido quando a Zendry informa (antes do envio, `null`).</ResponseField>
+<ResponseField name="crypto.usdtFeeMinor" type="integer">Taxa de rede cobrada pela Zendry, em USDT (6 casas).</ResponseField>
+<ResponseField name="crypto.rate" type="number">Reais por USDT aplicados na conversão do valor líquido (`netCents`).</ResponseField>
+<ResponseField name="crypto.txHash" type="string">Hash da transação na blockchain (também em `payoutReference` quando pago).</ResponseField>
+<ResponseField name="crypto.txUrl" type="string">Link da transação no explorador da rede (Tronscan, Polygonscan, BscScan ou Etherscan).</ResponseField>
+
+## Status
+
+| `status` | Significado |
+| :--- | :--- |
+| `analyzing` | Em revisão pela equipe (regra automática não passou ou saque automático desligado). |
+| `processing` | Sendo enviado automaticamente (Pix pela conta de saída, USDT pela Zendry). |
+| `under_review` | O envio não foi confirmado pela adquirente: a equipe confere antes de concluir. Nunca é reenviado sem conferência. |
+| `paid` | Pago. `payoutReference` traz o E2E do Pix ou o hash da transação USDT. |
+| `rejected` | Recusado pela equipe. `rejectionReason` explica e o valor volta ao saldo. |
+| `failed` | Não enviado (ex.: a adquirente recusou, carteira removida antes do envio). O valor volta ao saldo. |
+
+Consulte a cada 30–60 segundos enquanto o status for `processing`; em `analyzing` ou `under_review`, a cada alguns minutos.

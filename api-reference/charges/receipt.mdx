@@ -1,0 +1,52 @@
+---
+title: "Comprovante"
+api: "GET /api/transactions/{id}/receipt"
+description: "Dados do comprovante de uma venda: pagador, recebedor e código de autenticação."
+---
+
+Escopo exigido: `charges:read`.
+
+<ParamField path="id" type="string" required>ID da cobrança (`tx_…`).</ParamField>
+
+```bash
+curl https://api.azipix.com/api/transactions/tx_8F3A1C9B2D7E4F60/receipt \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+<ResponseExample>
+```json 200
+{
+  "transaction": {
+    "id": "tx_8F3A1C9B2D7E4F60",
+    "status": "paid",
+    "amountCents": 15000,
+    "paymentMethod": "pix",
+    "paidAt": "2026-11-04T18:01:12.000Z"
+  },
+  "payer": {
+    "name": "JOAO DA SILVA",
+    "document": "***.982.247-**",
+    "e2eId": "E00000000202611041801abcdef123456"
+  },
+  "receiver": {
+    "name": "Sua Loja",
+    "document": "12.***.***/0001-90",
+    "intermediary": "Azipix Pagamentos",
+    "processor": "Nome da adquirente"
+  },
+  "authCode": "3F9A1C0D2B7E4F6A8C1D0E2F4A6B8C0D1E3F5A7B"
+}
+```
+</ResponseExample>
+
+<ResponseField name="transaction" type="object">A cobrança, com os campos de [Consultar Cobrança](/api-reference/charges/get-charge).</ResponseField>
+<ResponseField name="payer" type="object">
+  Dados do pagador informados pela adquirente, quando disponíveis (nome, documento e, no Pix, o identificador `e2eId`). Pode vir `null`.
+</ResponseField>
+<ResponseField name="receiver" type="object">Recebedor (sua loja, com documento mascarado), intermediador e processador.</ResponseField>
+<ResponseField name="authCode" type="string">Código de autenticação do comprovante (40 caracteres), calculado pela Azipix a partir da venda. Permite à Azipix confirmar que um comprovante é verdadeiro.</ResponseField>
+
+<Note>
+  Para vendas pagas sem dados do pagador, a Azipix consulta a adquirente uma vez na primeira chamada e guarda o resultado.
+</Note>

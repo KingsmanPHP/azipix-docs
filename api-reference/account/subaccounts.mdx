@@ -1,0 +1,77 @@
+---
+title: "Subcontas"
+description: "Separe vendas, saldo, limites e webhooks por loja, marca ou cliente, dentro da mesma conta."
+---
+
+Uma **subconta** é uma divisão da sua conta: as vendas dela têm saldo, extrato, chargebacks e webhooks próprios, e você pode limitar métodos, valores e volume diário. Subcontas são criadas e editadas no painel (**Subcontas**). Pela API, você as usa e consulta.
+
+## Usando uma subconta nas chamadas
+
+| Como | Exemplo | Vale para |
+| :--- | :--- | :--- |
+| Campo `subaccountId` no corpo | `"subaccountId": "3c2e…"` | Criar cobrança |
+| Parâmetro `?subaccount=` | `?subaccount=3c2e…` | Listas, feed, extrato, chargebacks |
+| Cabeçalho `X-Subaccount-Id` | `X-Subaccount-Id: 3c2e…` | Listas, feed, extrato, chargebacks |
+| **Chave vinculada** à subconta | — | Tudo: a chave só opera dentro da subconta |
+
+Nos filtros, `main` significa só a conta principal e `all` (padrão) traz tudo.
+
+<Tip>
+  Para um parceiro ou loja que não deve ver o resto da sua conta, crie uma chave de API **vinculada à subconta**. Ela cria cobranças sempre na subconta e só enxerga os dados dela.
+</Tip>
+
+## Regras aplicadas na cobrança
+
+Ao criar uma cobrança numa subconta, a Azipix confere:
+
+- a subconta está **ativa** (inativa ou bloqueada recusa a cobrança);
+- o método está entre os **métodos permitidos** da subconta;
+- o valor respeita o **mínimo** e o **máximo** da subconta;
+- o **limite diário** da subconta não foi ultrapassado.
+
+## Webhooks da subconta
+
+As vendas de uma subconta são notificadas **somente** nas URLs de webhook da própria subconta (até 5), assinadas com o **segredo da subconta** — não o da conta principal. O segredo aparece no painel, ao abrir a subconta, e pode ser rotacionado lá. Todo evento traz `data.subaccountId`.
+
+## Listar subcontas
+
+`GET /api/subaccounts`
+
+```bash
+curl https://api.azipix.com/api/subaccounts \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+```json 200
+{
+  "data": [
+    {
+      "id": "3c2e9a1b-7f4d-4e2a-9b8c-1d2e3f4a5b6c",
+      "code": "LOJA-SP",
+      "name": "Loja São Paulo",
+      "description": null,
+      "status": "active",
+      "allowedMethods": ["pix", "credit_card"],
+      "minAmountCents": 500,
+      "maxAmountCents": 500000,
+      "dailyLimitCents": 5000000,
+      "webhooks": [{ "url": "https://lojasp.com/webhooks/azipix", "events": "payment.paid", "status": "ativo" }],
+      "createdAt": "2026-10-01T12:00:00.000Z",
+      "updatedAt": "2026-11-01T12:00:00.000Z"
+    }
+  ],
+  "policy": { "...": "limites de subcontas do seu plano" },
+  "used": 1
+}
+```
+
+Com uma chave vinculada, a lista traz só a subconta da chave.
+
+## Consultar uma subconta
+
+`GET /api/subaccounts/{id}`: devolve `data` (a subconta) e `balances` (saldo da subconta, nos mesmos campos de [Saldo](/api-reference/balance/balances)). O segredo de webhook da subconta **não** é devolvido para chaves de API, só no painel.
+
+<Note>
+  Criar, editar, arquivar subcontas e rotacionar o segredo de webhook são operações só do painel: pela API respondem `403 SessionRequired`.
+</Note>

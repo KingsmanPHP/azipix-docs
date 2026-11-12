@@ -1,8 +1,10 @@
 ---
 title: "Consultar Cobrança"
 api: "GET /api/transactions/{id}"
-description: "Retorna os dados e o status atual de uma cobrança."
+description: "Dados e status atual de uma cobrança."
 ---
+
+Escopo exigido: `charges:read`.
 
 <ParamField path="id" type="string" required>
   O `id` retornado na criação (ex.: `tx_8F3A1C9B2D7E4F60`).
@@ -10,7 +12,8 @@ description: "Retorna os dados e o status atual de uma cobrança."
 
 ```bash
 curl https://api.azipix.com/api/transactions/tx_8F3A1C9B2D7E4F60 \
-  --header 'x-api-key: ak_live_SUA_CHAVE'
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
 ```
 
 <ResponseExample>
@@ -27,6 +30,9 @@ curl https://api.azipix.com/api/transactions/tx_8F3A1C9B2D7E4F60 \
   "customerEmail": "joao.silva@exemplo.com.br",
   "customerDocument": "52998224725",
   "description": "Pedido #10842",
+  "subaccountId": null,
+  "settlementDays": 0,
+  "availableAt": "2026-11-04T18:01:12.000Z",
   "createdAt": "2026-11-04T18:00:00.000Z",
   "paidAt": "2026-11-04T18:01:12.000Z"
 }
@@ -37,8 +43,28 @@ curl https://api.azipix.com/api/transactions/tx_8F3A1C9B2D7E4F60 \
 ```
 </ResponseExample>
 
+## Campos principais
+
+<ResponseField name="status" type="string">
+  `pending`, `processing`, `paid`, `failed`, `refunded` ou `disputed`. Veja o ciclo de vida em [Pix](/api-reference/charges/create-pix) e [Cartão](/api-reference/charges/create-card).
+</ResponseField>
+<ResponseField name="paidAt" type="string">Quando o pagamento foi confirmado (ISO 8601).</ResponseField>
+<ResponseField name="availableAt" type="string">Quando o valor líquido fica disponível para saque.</ResponseField>
+<ResponseField name="failureReason" type="string">Motivo da recusa ou da falha, quando `status` é `failed`.</ResponseField>
+<ResponseField name="cardBrand" type="string">Bandeira do cartão (cobranças de cartão).</ResponseField>
+<ResponseField name="cardLastFour" type="string">4 últimos dígitos do cartão.</ResponseField>
+<ResponseField name="pixCode" type="string">Pix Copia e Cola (cobranças Pix).</ResponseField>
+
+## Plano B do webhook
+
+Se a cobrança estiver `pending` ou `processing`, esta consulta também **pergunta à adquirente** o status atual (no máximo uma vez a cada 10 segundos por cobrança) e já devolve o resultado atualizado. Use quando:
+
+- você não recebeu o webhook (servidor fora do ar, por exemplo);
+- vai cancelar um pedido pendente e quer ter certeza de que não foi pago;
+- acompanha um cartão em `processing` depois do 3DS.
+
 <Tip>
-  Use esta rota como **plano B** do webhook: se você não recebeu a notificação de um pedido (servidor fora do ar, por exemplo), consulte o status aqui antes de cancelar o pedido.
+  Para acompanhar uma cobrança, consulte a cada 5 a 30 segundos, não mais que isso. Para conciliar muitas vendas, use o [feed de vendas](/api-reference/charges/feed).
 </Tip>
 
-Uma cobrança só pode ser consultada pela conta que a criou. Para outras contas, a API responde `403`.
+Uma cobrança só pode ser consultada pela conta que a criou (ou pela subconta, com uma chave vinculada). Para qualquer outra, a resposta é `404`.

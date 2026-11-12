@@ -1,0 +1,89 @@
+---
+title: "Consultar Chargebacks e MED"
+api: "GET /api/chargebacks"
+description: "Disputas de cartão (chargeback) e de Pix (MED) das suas vendas, com prazos e valores bloqueados."
+---
+
+Escopo exigido: `chargebacks:read`.
+
+Quando um comprador contesta uma venda com o banco — chargeback no cartão ou **MED** (Mecanismo Especial de Devolução) no Pix — a Azipix registra a disputa, **bloqueia o valor** no seu saldo até a decisão e avisa por webhook (`chargeback.opened`). Se a adquirente aceitar defesa, você pode enviá-la pela API ([Enviar defesa](/api-reference/chargebacks/defense)).
+
+<ParamField query="status" type="string">Filtra por status (veja abaixo).</ParamField>
+<ParamField query="subaccount" type="string">ID de uma subconta, `main` ou `all`.</ParamField>
+
+```bash
+curl 'https://api.azipix.com/api/chargebacks?status=open' \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+<ResponseExample>
+```json 200
+{
+  "data": [
+    {
+      "id": "e3b0c442-98fc-4c14-9afb-f4c8996fb924",
+      "transactionId": "4d1f…",
+      "transactionExternalId": "tx_C0FFEE1234ABCD56",
+      "subaccountId": null,
+      "providerDisputeId": "1234567890",
+      "amountCents": 25000,
+      "currency": "BRL",
+      "reasonCode": "4837",
+      "reasonText": "Compra não reconhecida pelo portador",
+      "status": "open",
+      "evidenceSupported": true,
+      "evidenceNote": "Uma única vez por caso, até 10 arquivos (10 MB).",
+      "responseDeadline": "2026-11-12T23:59:59.000Z",
+      "openedAt": "2026-11-05T10:00:00.000Z",
+      "resolvedAt": null,
+      "feeCents": 0,
+      "isPixMed": false,
+      "createdAt": "2026-11-05T10:00:05.000Z",
+      "updatedAt": "2026-11-05T10:00:05.000Z"
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "amountCents": 25000,
+    "open": 1,
+    "responded": 0,
+    "overdue": 0,
+    "won": 0,
+    "lost": 0,
+    "feesCents": 0,
+    "blockedCents": 25000
+  }
+}
+```
+</ResponseExample>
+
+## Status
+
+| `status` | Significado |
+| :--- | :--- |
+| `open` | Aberta. Se `evidenceSupported` for `true`, envie a defesa antes de `responseDeadline`. |
+| `responded` | Defesa enviada, aguardando a decisão. |
+| `won` | Decidida a seu favor: o valor bloqueado volta ao saldo disponível. |
+| `lost` | Decidida contra: o valor bloqueado é devolvido ao comprador. |
+| `expired` | O prazo de resposta passou sem defesa. |
+
+## Campos importantes
+
+<ResponseField name="transactionExternalId" type="string">O `tx_…` da venda contestada.</ResponseField>
+<ResponseField name="amountCents" type="integer">Valor em disputa (bloqueado no seu saldo enquanto não houver decisão).</ResponseField>
+<ResponseField name="responseDeadline" type="string">Prazo para enviar a defesa. Na MED do Pix, o prazo costuma ser de 48 horas.</ResponseField>
+<ResponseField name="evidenceSupported" type="boolean">A adquirente desta venda aceita defesa pela API. `evidenceNote` explica as regras dela.</ResponseField>
+<ResponseField name="isPixMed" type="boolean">`true` para MED de Pix, `false` para chargeback de cartão.</ResponseField>
+<ResponseField name="feeCents" type="integer">Tarifa de chargeback cobrada, quando houver.</ResponseField>
+
+## Uma disputa específica
+
+`GET /api/chargebacks/{id}` devolve a disputa com os mesmos campos e mais:
+
+- `events`: o histórico da disputa (abertura, atualizações da adquirente, documentos, defesa);
+- `evidences`: os documentos já anexados (`id`, `file_name`, `mime_type`, `size_bytes`, `submitted_at`).
+
+## Atualizar com a adquirente
+
+`POST /api/chargebacks/{id}/sync` consulta a adquirente agora e devolve a disputa atualizada (até 10 por minuto). A Azipix também atualiza sozinha, então use só quando precisar do status na hora.

@@ -1,0 +1,82 @@
+---
+title: "Enviar Defesa"
+description: "Anexe documentos e envie a defesa de um chargeback ou MED dentro do prazo."
+---
+
+Escopo exigido: `chargebacks:write`.
+
+Funciona quando a disputa tem `evidenceSupported: true` e o prazo (`responseDeadline`) ainda não passou. O envio da defesa é **único**: depois de enviada, não é possível acrescentar documentos.
+
+## 1. Anexe os documentos
+
+`POST /api/chargebacks/{id}/evidences` — um arquivo por chamada, em base64.
+
+<ParamField body="fileName" type="string" required>Nome do arquivo (até 200 caracteres).</ParamField>
+<ParamField body="mimeType" type="string" required>`application/pdf`, `image/png` ou `image/jpeg`.</ParamField>
+<ParamField body="base64" type="string" required>Conteúdo do arquivo em base64 (até cerca de 10 MB).</ParamField>
+
+```bash
+curl --request POST \
+  --url https://api.azipix.com/api/chargebacks/e3b0c442-98fc-4c14-9afb-f4c8996fb924/evidences \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "fileName": "comprovante-entrega.pdf",
+    "mimeType": "application/pdf",
+    "base64": "JVBERi0xLjQKJ..."
+  }'
+```
+
+```json 201
+{
+  "success": true,
+  "data": {
+    "id": "7a9c1e3b-…",
+    "file_name": "comprovante-entrega.pdf",
+    "mime_type": "application/pdf",
+    "size_bytes": 182344,
+    "sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    "created_at": "2026-11-05T11:00:00.000Z"
+  }
+}
+```
+
+Até **10 arquivos** por disputa.
+
+Bons documentos: nota fiscal, comprovante de entrega com assinatura, conversas com o comprador, registro de acesso ao produto digital, termos aceitos no checkout.
+
+## 2. Revise (opcional)
+
+- `GET /api/chargebacks/{id}/evidences/{evidenceId}/url` devolve um link temporário para baixar o arquivo enviado.
+- `DELETE /api/chargebacks/{id}/evidences/{evidenceId}` remove um arquivo antes do envio da defesa.
+
+## 3. Envie a defesa
+
+`POST /api/chargebacks/{id}/submit`
+
+<ParamField body="defenseText" type="string">
+  Texto da defesa (até 4.000 caracteres). **Obrigatório na MED do Pix** (mínimo de 10 caracteres). Explique de forma objetiva por que a venda é legítima e cite os documentos anexados.
+</ParamField>
+
+```bash
+curl --request POST \
+  --url https://api.azipix.com/api/chargebacks/e3b0c442-98fc-4c14-9afb-f4c8996fb924/submit \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA' \
+  --header 'Content-Type: application/json' \
+  --data '{ "defenseText": "Produto digital entregue em 04/11 às 18:02 no e-mail do comprador; acesso registrado em 04/11 às 18:10 (anexos 1 e 2)." }'
+```
+
+A resposta traz a disputa atualizada, com `status: "responded"`. Você recebe `chargeback.updated` quando houver decisão.
+
+## Erros comuns
+
+| Mensagem | Motivo |
+| :--- | :--- |
+| `O prazo para resposta expirou.` | `responseDeadline` já passou. |
+| `O prazo de 48 h para a defesa da MED expirou.` | Prazo da MED do Pix encerrado. |
+| `Arquivo inválido. Envie PDF, PNG ou JPEG em base64.` | Tipo ou codificação do arquivo não aceitos. |
+| `Texto da defesa inválido (máximo de 4000 caracteres).` | Texto longo demais. |
+
+Limites: 20 arquivos por minuto e 5 envios de defesa por minuto.

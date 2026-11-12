@@ -4,6 +4,8 @@ api: "POST /api/transactions/charge"
 description: "Gera um Pix com QR Code e Copia e Cola."
 ---
 
+Escopo exigido: `charges:write`.
+
 ### Corpo da requisição
 
 <ParamField body="paymentMethod" type="string" required>
@@ -17,21 +19,29 @@ description: "Gera um Pix com QR Code e Copia e Cola."
 <ParamField body="customer" type="object" required>
   Dados do pagador.
   <Expandable title="propriedades">
-    <ParamField body="name" type="string" required>Nome completo.</ParamField>
+    <ParamField body="name" type="string" required>Nome completo (mínimo 2 caracteres).</ParamField>
     <ParamField body="email" type="string" required>E-mail válido.</ParamField>
     <ParamField body="document" type="string" required>
       CPF ou CNPJ **válido** (com ou sem pontuação). Documentos inválidos são recusados com `400`.
     </ParamField>
-    <ParamField body="phone" type="string">Telefone com DDD, ex.: `11987654321`.</ParamField>
+    <ParamField body="phone" type="string">Telefone com DDD, ex.: `11987654321`. Aparece no detalhe da venda no painel.</ParamField>
   </Expandable>
 </ParamField>
 
 <ParamField body="description" type="string">
-  Descrição do pedido (até 200 caracteres). Aparece no seu painel e no extrato do adquirente.
+  Descrição do pedido (até 200 caracteres). Aparece no seu painel.
+</ParamField>
+
+<ParamField body="subaccountId" type="string">
+  ID de uma [subconta](/api-reference/account/subaccounts) sua para registrar a venda nela. Com uma chave vinculada a uma subconta, este campo é ignorado: a venda vai sempre para a subconta da chave.
+</ParamField>
+
+<ParamField body="acquirerAccountId" type="string">
+  Opcional. Força uma das contas de recebimento liberadas para você (veja [Métodos e contas liberadas](/api-reference/account/routing)). Sem ele, a Azipix usa a conta configurada em **Integrações**.
 </ParamField>
 
 <ParamField header="X-Idempotency-Key" type="string">
-  UUID único por cobrança. Repetir a mesma chave devolve a cobrança original em vez de criar outra.
+  Valor único por cobrança (até 150 caracteres). Repetir a mesma chave devolve a cobrança original. Veja [Idempotência](/idempotency).
 </ParamField>
 
 ### Requisição
@@ -39,7 +49,8 @@ description: "Gera um Pix com QR Code e Copia e Cola."
 ```bash
 curl --request POST \
   --url https://api.azipix.com/api/transactions/charge \
-  --header 'x-api-key: ak_live_SUA_CHAVE' \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA' \
   --header 'Content-Type: application/json' \
   --header 'X-Idempotency-Key: f2b8a71c-34e8-4682-8cbf-9a3e2d6c1b74' \
   --data '{
@@ -64,8 +75,13 @@ curl --request POST \
   "netCents": 2954,
   "paymentMethod": "pix",
   "installments": 1,
+  "customerName": "Maria Oliveira",
+  "customerEmail": "maria@exemplo.com.br",
+  "customerDocument": "52998224725",
   "pixCode": "00020101021226...6304ABCD",
-  "pixQrCode": "data:image/png;base64,iVBORw0KGgo...",
+  "pixQrCode": "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=00020101...",
+  "description": "Curso Online",
+  "subaccountId": null,
   "createdAt": "2026-11-04T18:10:00.000Z"
 }
 ```
@@ -79,12 +95,30 @@ curl --request POST \
 ```
 </ResponseExample>
 
+### Campos da resposta
+
+<ResponseField name="id" type="string">ID da cobrança (`tx_` + 16 caracteres). Use em consultas e para casar com os webhooks.</ResponseField>
+<ResponseField name="status" type="string">Veja o ciclo de vida abaixo.</ResponseField>
+<ResponseField name="amountCents" type="integer">Valor cobrado, em centavos.</ResponseField>
+<ResponseField name="feeCents" type="integer">Tarifa da Azipix nesta venda, em centavos.</ResponseField>
+<ResponseField name="netCents" type="integer">Valor líquido para você (`amountCents − feeCents`).</ResponseField>
+<ResponseField name="pixCode" type="string">Pix Copia e Cola.</ResponseField>
+<ResponseField name="pixQrCode" type="string">Imagem do QR Code (URL ou `data:image/png;base64,...`).</ResponseField>
+<ResponseField name="settlementDays" type="integer">Dias até o valor ficar disponível para saque, após o pagamento.</ResponseField>
+
+A resposta pode trazer outros campos informativos. Ignore os que você não usa.
+
 ### Ciclo de vida
 
-| `status` | Significado |
-| :--- | :--- |
-| `pending` | Pix gerado, aguardando pagamento. |
-| `paid` | Pago e confirmado com o adquirente. Você recebe `payment.paid`. |
-| `failed` | Expirou ou foi cancelado no adquirente. Você recebe `payment.failed`. |
-| `refunded` | Estornado. Você recebe `payment.refunded`. |
-| `disputed` | O valor pago divergiu do valor cobrado. A venda fica retida para análise. |
+| `status` | Significado | Webhook |
+| :--- | :--- | :--- |
+| `pending` | Pix gerado, aguardando pagamento. | — |
+| `processing` | Ainda confirmando a criação com a adquirente (raro). Não gere outro Pix: o código aparece em `GET /transactions/{id}` assim que confirmado. | — |
+| `paid` | Pago e confirmado na API da adquirente, com o valor conferido. | `payment.paid` |
+| `failed` | Expirou, foi cancelado ou não pôde ser gerado. | `payment.failed` |
+| `refunded` | Estornado ao pagador. | `payment.refunded` |
+| `disputed` | O valor pago divergiu do valor cobrado. A venda fica retida para análise. | — |
+
+<Tip>
+  Um Pix só é marcado como pago depois que a Azipix confirma o pagamento direto na API da adquirente. Você pode liberar o pedido ao receber `payment.paid`.
+</Tip>

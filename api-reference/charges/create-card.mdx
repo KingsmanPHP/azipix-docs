@@ -1,14 +1,38 @@
 ---
 title: "Criar Cobrança Cartão"
 api: "POST /api/transactions/charge"
-description: "Cobrança à vista ou parcelada em até 12x, com o cartão tokenizado no navegador."
+description: "À vista ou em até 12x. O jeito de enviar o cartão depende da conta que processa seus cartões."
 ---
 
-<Warning>
-  **A API não aceita número de cartão nem CVV.** Os dados do cartão vão direto do navegador do comprador para o processador, que devolve um **token**. Seu servidor envia só esse token para a Azipix. Assim, nem você nem a Azipix armazenam ou trafegam dados de cartão (exigência PCI-DSS).
-</Warning>
+Escopo exigido: `charges:write`.
 
-## Como funciona
+<Tip>
+  **Não quer lidar com dados de cartão?** Use um [link de pagamento](/api-reference/payment-links/create): o checkout da Azipix coleta o cartão, faz o 3DS e confirma o pagamento por você.
+</Tip>
+
+## Qual fluxo usar
+
+A conta que processa os seus cartões define como o cartão chega à Azipix. Consulte uma vez e guarde em cache:
+
+```bash
+curl https://api.azipix.com/api/transactions/routing \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+Em `accounts`, veja a conta que tem `credit_card` em `supportedMethods`:
+
+| `provider` da conta | Fluxo | O que o seu servidor envia |
+| :--- | :--- | :--- |
+| `mercadopago` | **Token**: o cartão é tokenizado no navegador com o MercadoPago.js. | `cardToken` + `paymentMethodId` |
+| `zendry` | **Cartão + 3DS**: o cartão vai pelo seu servidor e o banco pode pedir confirmação ao comprador. | `card` + `device` + IP e navegador do comprador |
+
+Se `routing.allowedPaymentMethods` não tiver `credit_card`, o cartão não está liberado para a sua conta. Veja [Métodos e contas liberadas](/api-reference/account/routing).
+
+<Tabs>
+<Tab title="Token (Mercado Pago)">
+
+Os dados do cartão vão direto do navegador do comprador para o Mercado Pago, que devolve um **token** de uso único. Seu servidor envia só o token. Nem você nem a Azipix trafegam o número do cartão.
 
 ```mermaid
 sequenceDiagram
@@ -19,41 +43,18 @@ sequenceDiagram
     participant Back as Seu servidor
     participant Azipix as API Azipix
 
-    Back->>Azipix: GET /transactions/routing (uma vez, para obter a publicKey)
+    Back->>Azipix: GET /transactions/routing (publicKey, uma vez)
     Comprador->>Front: Digita os dados do cartão
     Front->>MP: createCardToken(dados)
     MP-->>Front: token (uso único)
     Front->>Back: token + paymentMethodId + parcelas
     Back->>Azipix: POST /transactions/charge { cardToken, ... }
-    Azipix-->>Back: status paid / processing / failed
+    Azipix-->>Back: paid / processing / failed
 ```
 
-## 1. Obtenha a Public Key
+### 1. Tokenize no navegador
 
-A Public Key identifica a conta que processa os seus cartões. Ela é **pública** (pode ir para o navegador) e muda só se a Azipix trocar a conta. Busque-a uma vez e guarde em cache:
-
-```bash
-curl https://api.azipix.com/api/transactions/routing \
-  --header 'x-api-key: ak_live_SUA_CHAVE'
-```
-
-```json
-{
-  "routing": { "allowedPaymentMethods": ["pix", "credit_card"], "cardEnabled": true },
-  "accounts": [
-    {
-      "id": "acc_mercadopago_xxxx",
-      "provider": "mercadopago",
-      "supportedMethods": ["pix", "credit_card"],
-      "publicKey": "APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-    }
-  ]
-}
-```
-
-Use a `publicKey` da conta cujo `supportedMethods` inclui `credit_card`. Se `allowedPaymentMethods` não tiver `credit_card`, o cartão não está liberado para a sua conta.
-
-## 2. Tokenize no navegador
+Use a `publicKey` da conta (é pública, pode ir para o navegador):
 
 ```html
 <script src="https://sdk.mercadopago.com/js/v2"></script>
@@ -70,8 +71,8 @@ Use a `publicKey` da conta cujo `supportedMethods` inclui `credit_card`. Se `all
     const token = await mp.createCardToken({
       cardNumber: numero,
       cardholderName: form.titular.value,
-      cardExpirationMonth: form.mes.value,      // "11"
-      cardExpirationYear: form.ano.value,       // "2028"
+      cardExpirationMonth: form.mes.value,  // "11"
+      cardExpirationYear: form.ano.value,   // "2028"
       securityCode: form.cvv.value,
       identificationType: "CPF",
       identificationNumber: form.cpf.value.replace(/\D/g, ""),
@@ -84,42 +85,16 @@ Use a `publicKey` da conta cujo `supportedMethods` inclui `credit_card`. Se `all
 ```
 
 <Note>
-  O token é de **uso único** e expira em poucos dias. Gere um novo a cada tentativa de pagamento.
+  O token é de **uso único** e expira em poucos dias. Gere um novo a cada tentativa.
 </Note>
 
-## 3. Crie a cobrança (no seu servidor)
+### 2. Crie a cobrança no seu servidor
 
-### Corpo da requisição
-
-<ParamField body="paymentMethod" type="string" required>`"credit_card"`</ParamField>
-
-<ParamField body="amountCents" type="integer" required>
-  Valor total em centavos (mínimo `100`).
-</ParamField>
-
-<ParamField body="cardToken" type="string" required>
-  Token gerado pelo `mp.createCardToken`.
-</ParamField>
-
-<ParamField body="paymentMethodId" type="string" required>
-  Bandeira retornada pelo `mp.getPaymentMethods` (`visa`, `master`, `elo`, `amex`, `hipercard`...).
-</ParamField>
-
-<ParamField body="installments" type="integer" default="1">
-  Número de parcelas, de 1 a 12. Parcelas acima de 1 têm tarifa adicional por parcela (veja suas taxas no painel).
-</ParamField>
-
-<ParamField body="customer" type="object" required>
-  `name`, `email`, `document` (CPF/CNPJ válido) e `phone` (opcional). Use o mesmo documento informado na tokenização.
-</ParamField>
-
-<ParamField body="description" type="string">Descrição do pedido (até 200 caracteres).</ParamField>
-
-<RequestExample>
-```bash cURL
+```bash
 curl --request POST \
   --url https://api.azipix.com/api/transactions/charge \
-  --header 'x-api-key: ak_live_SUA_CHAVE' \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA' \
   --header 'Content-Type: application/json' \
   --header 'X-Idempotency-Key: 0c9e3c7a-0a58-4f5e-9d2b-7c1f0b8f4e21' \
   --data '{
@@ -137,26 +112,164 @@ curl --request POST \
   }'
 ```
 
-```javascript Node.js
-const res = await fetch("https://api.azipix.com/api/transactions/charge", {
-  method: "POST",
-  headers: {
-    "x-api-key": process.env.AZIPIX_API_KEY,
-    "Content-Type": "application/json",
-    "X-Idempotency-Key": crypto.randomUUID(),
-  },
-  body: JSON.stringify({
-    amountCents: 25000,
-    paymentMethod: "credit_card",
-    installments: 3,
-    cardToken,          // recebido do seu front
-    paymentMethodId,    // recebido do seu front
-    customer: { name: "Carlos Eduardo Lima", email: "carlos@exemplo.com", document: "52998224725" },
-  }),
-});
-const charge = await res.json();
+</Tab>
+<Tab title="Cartão + 3DS (Zendry)">
+
+Esta conta não tem tokenização: o cartão vai do seu checkout para o **seu servidor** e dele para a Azipix, por HTTPS. A Azipix usa o cartão só durante a autorização: **não armazena nem registra** número ou CVV e devolve apenas a bandeira e os 4 últimos dígitos. O 3DS (confirmação com o banco) roda no navegador do comprador com o script `zendry.js`, que não vê o cartão nem precisa de chave.
+
+<Warning>
+  **PCI-DSS:** se o seu checkout recebe o número do cartão e o envia pelo seu servidor, os seus sistemas que tocam nesses dados entram no escopo do PCI-DSS (questionário SAQ D). Nunca grave número ou CVV, nem em logs. Se não quiser essa responsabilidade, use um [link de pagamento](/api-reference/payment-links/create).
+</Warning>
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Comprador
+    participant Front as Seu checkout (navegador)
+    participant Z as zendry.js
+    participant Back as Seu servidor
+    participant Azipix as API Azipix
+
+    Comprador->>Front: Digita os dados do cartão
+    Front->>Z: Zendry.threeDS()
+    Z-->>Front: device (idioma, tela, fuso)
+    Front->>Back: cartão + device (HTTPS)
+    Back->>Azipix: POST /transactions/charge { card, device, buyerIp, buyerUserAgent }
+    alt Aprovado ou recusado na hora
+        Azipix-->>Back: paid / failed
+    else Banco pede confirmação (3DS)
+        Azipix-->>Back: processing + threeDS.action
+        Back-->>Front: threeDS.action (sem alterar)
+        Front->>Z: Zendry.completeThreeDS(action)
+        Comprador->>Z: Confirma no app/site do banco
+        Azipix-->>Back: webhook payment.paid / payment.failed
+    end
 ```
-</RequestExample>
+
+### 1. Colete o cartão e os dados do navegador
+
+```html
+<script src="https://api.zendry.co/sdk/v1/zendry.js"></script>
+<script>
+  async function pagar(form) {
+    // Dados do navegador para a análise 3DS (nenhum dado de cartão passa pelo SDK)
+    const r = await Zendry.threeDS();
+    const device = r.device ?? r;
+
+    const resposta = await fetch("/seu-servidor/pagar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        card: {
+          number: form.numero.value.replace(/\D/g, ""),
+          holderName: form.titular.value,
+          expMonth: form.mes.value,  // "11"
+          expYear: form.ano.value,   // "2028" ou "28"
+          cvv: form.cvv.value,
+        },
+        device,
+        installments: Number(form.parcelas.value),
+      }),
+    }).then((r) => r.json());
+
+    // 3DS: o banco pediu confirmação ao comprador
+    if (resposta.status === "processing" && resposta.threeDS?.action) {
+      await Zendry.completeThreeDS(resposta.threeDS.action); // só para a tela
+      // o resultado oficial vem pelo webhook ou por GET /transactions/{id}
+    }
+  }
+</script>
+```
+
+### 2. Crie a cobrança no seu servidor
+
+Envie o IP e o navegador **do comprador** (não os do seu servidor): eles alimentam a análise antifraude.
+
+```javascript Node.js
+app.post("/seu-servidor/pagar", async (req, res) => {
+  const r = await fetch("https://api.azipix.com/api/transactions/charge", {
+    method: "POST",
+    headers: {
+      "x-api-key": process.env.AZIPIX_KEY_ID,
+      "x-api-secret": process.env.AZIPIX_SECRET_KEY,
+      "Content-Type": "application/json",
+      "X-Idempotency-Key": crypto.randomUUID(),
+    },
+    body: JSON.stringify({
+      amountCents: 25000,
+      paymentMethod: "credit_card",
+      installments: req.body.installments,
+      card: req.body.card,     // repasse sem gravar e sem logar
+      device: req.body.device,
+      buyerIp: req.ip,
+      buyerUserAgent: req.get("user-agent"),
+      description: "Pedido #4092",
+      customer: { name: "Carlos Eduardo Lima", email: "carlos@exemplo.com", document: "52998224725" },
+    }),
+  });
+  const charge = await r.json();
+  // devolva ao front só o necessário: status, id, failureReason e threeDS
+  res.status(r.status).json({ id: charge.id, status: charge.status, failureReason: charge.failureReason, threeDS: charge.threeDS });
+});
+```
+
+<Note>
+  Este fluxo exige o **CPF** do comprador (11 dígitos) em `customer.document`. O `threeDS.action` é de uso único e expira em 15 minutos: se o comprador não confirmar a tempo, a venda é recusada. Para tentar de novo, crie outra cobrança.
+</Note>
+
+</Tab>
+</Tabs>
+
+## Corpo da requisição
+
+<ParamField body="paymentMethod" type="string" required>`"credit_card"`</ParamField>
+
+<ParamField body="amountCents" type="integer" required>
+  Valor total em centavos (mínimo `100`). Em vez dele, você pode enviar `amount` em reais.
+</ParamField>
+
+<ParamField body="installments" type="integer" default="1">
+  Número de parcelas, de 1 a 12. Parcelas acima de 1 podem ter tarifa adicional (veja suas taxas no painel).
+</ParamField>
+
+<ParamField body="customer" type="object" required>
+  `name`, `email`, `document` (CPF/CNPJ válido; **CPF** no fluxo Cartão + 3DS) e `phone` (opcional).
+</ParamField>
+
+<ParamField body="cardToken" type="string">
+  **Fluxo Token.** Token gerado pelo `mp.createCardToken`. Não envie junto com `card`.
+</ParamField>
+
+<ParamField body="paymentMethodId" type="string">
+  **Fluxo Token.** Bandeira retornada pelo `mp.getPaymentMethods` (`visa`, `master`, `elo`, `amex`, `hipercard`…).
+</ParamField>
+
+<ParamField body="card" type="object">
+  **Fluxo Cartão + 3DS.** Nunca é armazenado nem registrado. Não envie junto com `cardToken`.
+  <Expandable title="propriedades">
+    <ParamField body="number" type="string" required>Número do cartão, 13 a 19 dígitos (espaços são ignorados).</ParamField>
+    <ParamField body="holderName" type="string" required>Nome impresso no cartão.</ParamField>
+    <ParamField body="expMonth" type="string" required>Mês de validade, `1` a `12`.</ParamField>
+    <ParamField body="expYear" type="string" required>Ano de validade, `2028` ou `28`.</ParamField>
+    <ParamField body="cvv" type="string" required>Código de segurança, 3 ou 4 dígitos.</ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="device" type="object">
+  **Fluxo Cartão + 3DS.** O retorno de `Zendry.threeDS()`: `language`, `screen_height`, `screen_width`, `time_zone_offset`. Algumas contas com antifraude reforçado exigem.
+</ParamField>
+
+<ParamField body="buyerIp" type="string">**Fluxo Cartão + 3DS.** IP do comprador (IPv4 ou IPv6).</ParamField>
+
+<ParamField body="buyerUserAgent" type="string">**Fluxo Cartão + 3DS.** User-agent do navegador do comprador (até 500 caracteres).</ParamField>
+
+<ParamField body="description" type="string">Descrição do pedido (até 200 caracteres).</ParamField>
+
+<ParamField body="subaccountId" type="string">Registra a venda numa [subconta](/api-reference/account/subaccounts) sua.</ParamField>
+
+<ParamField header="X-Idempotency-Key" type="string">Valor único por tentativa. Veja [Idempotência](/idempotency).</ParamField>
+
+## Respostas
 
 <ResponseExample>
 ```json Aprovado
@@ -168,8 +281,8 @@ const charge = await res.json();
   "netCents": 23129,
   "paymentMethod": "credit_card",
   "installments": 3,
-  "cardBrand": "master",
-  "cardLastFour": "4242",
+  "cardBrand": "mastercard",
+  "cardLastFour": "4444",
   "createdAt": "2026-11-04T18:15:00.000Z",
   "paidAt": "2026-11-04T18:15:02.000Z"
 }
@@ -181,42 +294,58 @@ const charge = await res.json();
   "status": "failed",
   "amountCents": 25000,
   "paymentMethod": "credit_card",
-  "failureReason": "cc_rejected_insufficient_amount",
+  "cardBrand": "visa",
+  "cardLastFour": "1111",
+  "failureReason": "Saldo ou limite insuficiente.",
   "createdAt": "2026-11-04T18:16:00.000Z"
 }
 ```
 
-```json Em análise
+```json 3DS pendente
 {
   "id": "tx_C0FFEE1234ABCD58",
   "status": "processing",
   "amountCents": 25000,
   "paymentMethod": "credit_card",
+  "cardBrand": "visa",
+  "cardLastFour": "1111",
+  "threeDS": {
+    "provider": "zendry",
+    "action": { "...": "repasse ao Zendry.completeThreeDS sem alterar" }
+  },
   "createdAt": "2026-11-04T18:17:00.000Z"
 }
 ```
 </ResponseExample>
 
+Uma recusa **não** é erro HTTP: a resposta é `201` com `status: "failed"` e o motivo em `failureReason`.
+
 ## Interpretando o resultado
 
 | `status` | O que fazer |
 | :--- | :--- |
-| `paid` | Pagamento aprovado. Libere o pedido. |
-| `processing` | Em análise antifraude do emissor. **Não cobre de novo.** A decisão chega por webhook (`payment.paid` ou `payment.failed`). |
-| `failed` | Recusado. Mostre uma mensagem genérica ao comprador e permita tentar com outro cartão (gerando um token novo). |
+| `paid` | Aprovado e confirmado na adquirente. Libere o pedido. |
+| `processing` | Aguardando o banco: análise antifraude ou confirmação 3DS (`threeDS.action`). **Não cobre de novo.** A decisão chega por webhook (`payment.paid` ou `payment.failed`) e aparece em `GET /transactions/{id}`. |
+| `failed` | Recusado. Mostre `failureReason` (ou uma mensagem genérica) e deixe tentar com outro cartão, numa cobrança nova. |
+| `refunded` | Estornado. Você recebe `payment.refunded`. |
 
-### Motivos de recusa mais comuns (`failureReason`)
+### Motivos de recusa
 
-| Código | Significado |
+`failureReason` vem pronto para mostrar ao comprador. Exemplos:
+
+| Fluxo Cartão + 3DS | Fluxo Token |
 | :--- | :--- |
-| `cc_rejected_insufficient_amount` | Saldo/limite insuficiente. |
-| `cc_rejected_bad_filled_security_code` | CVV incorreto. |
-| `cc_rejected_bad_filled_date` | Validade incorreta. |
-| `cc_rejected_bad_filled_other` | Dados do cartão incorretos. |
-| `cc_rejected_high_risk` | Recusado pelo antifraude. |
-| `cc_rejected_call_for_authorize` | O comprador precisa autorizar com o banco emissor. |
-| `cc_rejected_other_reason` | Recusa genérica do emissor. |
+| `Saldo ou limite insuficiente.` | `cc_rejected_insufficient_amount` |
+| `Pagamento não autorizado pelo banco emissor. Tente outro cartão.` | `cc_rejected_other_reason` |
+| `Número do cartão inválido.` | `cc_rejected_bad_filled_other` |
+| `Cartão vencido.` | `cc_rejected_bad_filled_date` |
+| `Este cartão não pode ser usado para esta compra.` | `cc_rejected_call_for_authorize` |
+| `Pagamento não autorizado por segurança. Fale com o banco emissor.` | `cc_rejected_high_risk` |
+
+## Estornos
+
+Estornos são feitos pelo suporte Azipix. No fluxo Cartão + 3DS, o estorno é **total** e só é possível em até **24 horas** após a aprovação. Você recebe o evento `payment.refunded` e o valor sai do seu saldo.
 
 ## Liquidação
 
-O valor líquido (`netCents`) de vendas no cartão fica disponível para saque após o prazo de liquidação da sua conta (padrão **D+30**). Até lá, aparece como **saldo a liberar** no painel.
+O valor líquido (`netCents`) de vendas no cartão fica disponível para saque após o prazo de liquidação da sua conta (`settlementDays`, normalmente 30 dias). Até lá, aparece como **saldo a liberar**.

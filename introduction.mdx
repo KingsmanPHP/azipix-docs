@@ -1,53 +1,77 @@
 ---
 title: "Introdução"
-description: "API da Azipix para receber pagamentos via Pix e Cartão de Crédito."
+description: "API da Azipix para receber via Pix e cartão de crédito, acompanhar saldo e conciliar vendas."
 ---
 
-A API da **Azipix** permite criar cobranças Pix e de cartão de crédito a partir do seu sistema, consultar o status de cada venda e receber notificações automáticas (webhooks) quando um pagamento é confirmado.
+Com a API da **Azipix** o seu sistema cria cobranças Pix e de cartão, consulta o status de cada venda, acompanha saldo e extrato e recebe notificações assinadas (webhooks) quando um pagamento é confirmado, recusado ou estornado.
 
 <CardGroup cols={2}>
   <Card title="Pix" icon="bolt" href="/api-reference/charges/create-pix">
-    Gere um QR Code e o Pix Copia e Cola. A confirmação chega por webhook segundos depois do pagamento.
+    QR Code e Pix Copia e Cola. A confirmação chega por webhook segundos depois do pagamento.
   </Card>
-  <Card title="Cartão de Crédito" icon="credit-card" href="/api-reference/charges/create-card">
-    À vista ou parcelado em até 12x, com o cartão tokenizado no navegador do comprador.
+  <Card title="Cartão de crédito" icon="credit-card" href="/api-reference/charges/create-card">
+    À vista ou em até 12x, com tokenização no navegador ou com 3DS, conforme a conta que processa seus cartões.
+  </Card>
+  <Card title="Links de pagamento" icon="link" href="/api-reference/payment-links/create">
+    Checkout pronto da Azipix: você não precisa tocar em dados de cartão.
   </Card>
   <Card title="Webhooks" icon="bell" href="/webhooks/overview">
-    Notificações assinadas com HMAC-SHA256 quando uma venda é paga, recusada ou estornada.
+    Notificações assinadas com HMAC-SHA256 para vendas, estornos e chargebacks.
   </Card>
-  <Card title="Consulta" icon="magnifying-glass" href="/api-reference/charges/get-charge">
-    Consulte o status de qualquer cobrança a qualquer momento.
+  <Card title="Saldo e extrato" icon="wallet" href="/api-reference/balance/balances">
+    Saldo disponível, a liberar e bloqueado, e cada movimentação com a sua origem.
+  </Card>
+  <Card title="Chargebacks e MED" icon="shield-halved" href="/api-reference/chargebacks/list">
+    Acompanhe disputas e envie a defesa com documentos pela API.
   </Card>
 </CardGroup>
 
 ## URL base
 
-Todas as rotas desta documentação usam a URL base:
-
 ```text
 https://api.azipix.com/api
 ```
 
+Todas as rotas desta documentação são relativas a essa URL. Por exemplo, criar cobrança é `POST https://api.azipix.com/api/transactions/charge`.
+
 <Note>
-  Só aceitamos HTTPS. Faça as chamadas **a partir do seu servidor**, nunca do navegador ou de um app: a chave de API dá acesso à sua conta.
+  Só aceitamos HTTPS. Chame a API **a partir do seu servidor**, nunca do navegador ou de um app: a chave secreta dá acesso à sua conta.
 </Note>
 
 ## Antes de começar
 
-1. Sua conta precisa estar **aprovada** pelo compliance da Azipix. Enquanto estiver em análise, a API responde `403 AccountNotApproved`.
-2. Os métodos de pagamento (Pix e/ou Cartão) precisam estar **liberados** para a sua conta. Confira em **Integrações** no painel.
-3. Crie uma chave de API em **Integrações → Chaves de API**.
+<Steps>
+  <Step title="Conta aprovada">
+    Sua conta precisa estar **aprovada** pelo compliance. Enquanto estiver em análise, a API responde `403 AccountNotApproved` nas rotas de cobrança.
+  </Step>
+  <Step title="Métodos liberados">
+    Pix e/ou Cartão precisam estar **liberados** para a sua conta e ativos em **Integrações** no painel. Você confere pela API em [Métodos e contas liberadas](/api-reference/account/routing).
+  </Step>
+  <Step title="Credenciais">
+    Crie um par de credenciais em **Integrações → Chaves de API**. Veja [Autenticação](/authentication).
+  </Step>
+</Steps>
+
+## O que a API faz e o que fica no painel
+
+| Pela API | Só pelo painel |
+| :--- | :--- |
+| Criar e consultar cobranças, comprovantes e o feed de vendas | Criar, rotacionar e revogar chaves de API |
+| Criar e gerenciar links de pagamento | Configurar saques programados (regras automáticas) |
+| Consultar saldo, extrato e saques | Criar e editar subcontas |
+| Solicitar saques por Pix (chave Banking) e em USDT (escopo `withdrawals:write`) | Cadastrar a chave Pix e as carteiras USDT que recebem os saques |
+| Consultar chargebacks e enviar a defesa | |
 
 ## Próximos passos
 
-<Steps>
-  <Step title="Autenticação">
-    [Como usar sua chave de API](/authentication).
-  </Step>
-  <Step title="Primeira cobrança">
-    [Crie um Pix em 5 minutos](/quickstart).
-  </Step>
-  <Step title="Webhooks">
-    [Receba a confirmação de pagamento no seu servidor](/webhooks/overview).
-  </Step>
-</Steps>
+<CardGroup cols={3}>
+  <Card title="Início rápido" icon="rocket" href="/quickstart">
+    Seu primeiro Pix em 5 minutos.
+  </Card>
+  <Card title="Ambientes e testes" icon="flask" href="/environments">
+    Credenciais de teste e o que muda no sandbox.
+  </Card>
+  <Card title="Webhooks" icon="bell" href="/webhooks/overview">
+    Receba a confirmação no seu servidor.
+  </Card>
+</CardGroup>

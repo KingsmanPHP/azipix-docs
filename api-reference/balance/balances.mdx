@@ -1,0 +1,48 @@
+---
+title: "Saldo"
+api: "GET /api/withdrawals/balances"
+description: "Saldo disponível, a liberar e bloqueado, e as regras de saque da sua conta."
+---
+
+Escopo exigido: `balance:read`.
+
+```bash
+curl https://api.azipix.com/api/withdrawals/balances \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+<ResponseExample>
+```json 200
+{
+  "availableCents": 1284500,
+  "escrowCents": 452000,
+  "blockedCents": 25000,
+  "totalCents": 1761500,
+  "withdrawnCents": 3900000,
+  "source": "ledger",
+  "withdrawalFeeCents": 367,
+  "withdrawalFeePercentBp": 0,
+  "withdrawalMinCents": 1000,
+  "withdrawalMaxCents": 5000000
+}
+```
+</ResponseExample>
+
+<ResponseField name="availableCents" type="integer">
+  Disponível para saque agora. Pode ficar negativo se um chargeback ou tarifa for debitado sem saldo suficiente.
+</ResponseField>
+<ResponseField name="escrowCents" type="integer">A liberar: vendas pagas que ainda não chegaram ao prazo de liquidação.</ResponseField>
+<ResponseField name="blockedCents" type="integer">Bloqueado por chargebacks e MED em aberto.</ResponseField>
+<ResponseField name="totalCents" type="integer">Soma de disponível, a liberar e bloqueado.</ResponseField>
+<ResponseField name="withdrawnCents" type="integer">Total já sacado.</ResponseField>
+<ResponseField name="withdrawalFeeCents" type="integer">Tarifa fixa por saque, em centavos.</ResponseField>
+<ResponseField name="withdrawalFeePercentBp" type="integer">Tarifa percentual por saque, em pontos-base (`100` = 1%).</ResponseField>
+<ResponseField name="withdrawalMinCents" type="integer">Valor mínimo de um saque.</ResponseField>
+<ResponseField name="withdrawalMaxCents" type="integer">Valor máximo de um saque.</ResponseField>
+
+Com uma chave vinculada a uma subconta, o saldo é o da subconta.
+
+<Note>
+  Os valores de exemplo são ilustrativos. Tarifas e limites de saque dependem do seu plano.
+</Note>

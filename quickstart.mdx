@@ -4,20 +4,20 @@ description: "Crie sua primeira cobrança Pix e receba a confirmação por webho
 ---
 
 <Steps>
-  <Step title="Crie uma chave de API">
-    No painel, vá em **Integrações → Chaves de API → Nova chave** e copie a chave (`ak_live_...`). Ela só aparece uma vez.
+  <Step title="Crie as credenciais">
+    No painel, vá em **Integrações → Chaves de API → Nova chave** e copie o ID (`pk_live_…`) e a chave secreta (`sk_live_…`). O segredo só aparece uma vez. Para testar sem dinheiro real, crie uma chave de **teste** (`sk_test_…`): veja [Ambientes e testes](/environments).
   </Step>
   <Step title="Cadastre seu webhook">
-    Em **Integrações → Webhooks**, adicione a URL `https://` do seu servidor e copie o **Segredo** exibido. Veja [como validar a assinatura](/webhooks/signature).
+    Em **Integrações → Webhooks**, adicione a URL `https://` do seu servidor e copie o **segredo** (`whsec_…`). Veja [como validar a assinatura](/webhooks/signature).
   </Step>
   <Step title="Crie a cobrança">
-    Envie um `POST /transactions/charge` como no exemplo abaixo.
+    Envie um `POST /transactions/charge` do seu servidor, como no exemplo abaixo.
   </Step>
   <Step title="Mostre o Pix ao comprador">
     Exiba o `pixCode` (Copia e Cola) e/ou a imagem `pixQrCode`.
   </Step>
   <Step title="Receba a confirmação">
-    Quando o comprador pagar, enviamos o evento `payment.paid` para o seu webhook.
+    Quando o comprador pagar, enviamos o evento `payment.paid` para o seu webhook. Libere o pedido.
   </Step>
 </Steps>
 
@@ -28,7 +28,8 @@ description: "Crie sua primeira cobrança Pix e receba a confirmação por webho
 ```bash cURL
 curl --request POST \
   --url https://api.azipix.com/api/transactions/charge \
-  --header 'x-api-key: ak_live_SUA_CHAVE' \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA' \
   --header 'Content-Type: application/json' \
   --header 'X-Idempotency-Key: 6f1c2a90-3b1e-4f0e-9d4a-0b7c5e2f8a11' \
   --data '{
@@ -45,10 +46,13 @@ curl --request POST \
 ```
 
 ```javascript Node.js
+import crypto from "node:crypto";
+
 const response = await fetch("https://api.azipix.com/api/transactions/charge", {
   method: "POST",
   headers: {
-    "x-api-key": process.env.AZIPIX_API_KEY,
+    "x-api-key": process.env.AZIPIX_KEY_ID,        // pk_live_…
+    "x-api-secret": process.env.AZIPIX_SECRET_KEY, // sk_live_…
     "Content-Type": "application/json",
     "X-Idempotency-Key": crypto.randomUUID(),
   },
@@ -76,7 +80,8 @@ import os, uuid, requests
 response = requests.post(
     "https://api.azipix.com/api/transactions/charge",
     headers={
-        "x-api-key": os.environ["AZIPIX_API_KEY"],
+        "x-api-key": os.environ["AZIPIX_KEY_ID"],         # pk_live_…
+        "x-api-secret": os.environ["AZIPIX_SECRET_KEY"],  # sk_live_…
         "X-Idempotency-Key": str(uuid.uuid4()),
     },
     json={
@@ -116,8 +121,10 @@ curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST => true,
     CURLOPT_POSTFIELDS => json_encode($payload),
+    CURLOPT_TIMEOUT => 30,
     CURLOPT_HTTPHEADER => [
-        "x-api-key: " . getenv("AZIPIX_API_KEY"),
+        "x-api-key: " . getenv("AZIPIX_KEY_ID"),
+        "x-api-secret: " . getenv("AZIPIX_SECRET_KEY"),
         "Content-Type: application/json",
         "X-Idempotency-Key: " . bin2hex(random_bytes(16)),
     ],
@@ -143,17 +150,24 @@ echo $charge["pixCode"];
   "customerName": "João da Silva",
   "customerEmail": "joao.silva@exemplo.com.br",
   "customerDocument": "52998224725",
+  "customerPhone": "11987654321",
   "pixCode": "00020101021226...6304ABCD",
-  "pixQrCode": "data:image/png;base64,iVBORw0KGgo...",
+  "pixQrCode": "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=00020101...",
   "description": "Pedido #10842",
   "createdAt": "2026-11-04T18:00:00.000Z"
 }
 ```
 
 <Tip>
-  Guarde o `id` junto ao pedido no seu sistema. Ele vem no webhook e serve para consultar a cobrança em `GET /transactions/{id}`.
+  Guarde o `id` junto ao pedido no seu sistema. Ele vem em todos os webhooks e serve para consultar a cobrança em `GET /transactions/{id}`.
 </Tip>
 
 <Note>
-  `pixQrCode` pode vir como imagem em base64 (`data:image/png;base64,...`) ou como URL de imagem. Os dois funcionam direto no atributo `src` de uma tag `<img>`.
+  `pixQrCode` pode vir como URL de imagem ou como imagem em base64 (`data:image/png;base64,...`). Os dois funcionam direto no atributo `src` de uma tag `<img>`. As tarifas (`feeCents`) dependem do seu plano.
 </Note>
+
+## E depois?
+
+- Cobrar no cartão: [Criar Cobrança Cartão](/api-reference/charges/create-card).
+- Não quer construir checkout? Use um [link de pagamento](/api-reference/payment-links/create).
+- Repita chamadas com segurança: [Idempotência](/idempotency).

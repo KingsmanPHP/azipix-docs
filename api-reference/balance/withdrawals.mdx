@@ -1,0 +1,93 @@
+---
+title: "Listar saques"
+api: "GET /api/withdrawals"
+description: "Histórico de saques da conta: pedidos do painel, das regras automáticas e da API."
+---
+
+Escopo exigido: `balance:read`.
+
+Saques podem ser pedidos no painel (Pix ou **Sacar via USDT**), criados pelas **regras de saque automático** (**Configurações → Saques automáticos**, só Pix) ou solicitados pela API com o escopo `withdrawals:write` (veja [Solicitar saque](/api-reference/balance/request-withdrawal)). Esta rota devolve os 500 mais recentes.
+
+```bash
+curl https://api.azipix.com/api/withdrawals \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA'
+```
+
+<ResponseExample>
+```json 200
+{
+  "total": 2,
+  "data": [
+    {
+      "id": "c0ffee00-1d2c-4b3a-8e9f-0a1b2c3d4e5f",
+      "amountCents": 50000,
+      "feeCents": 367,
+      "netCents": 49633,
+      "pixKeyType": "usdt_trc20",
+      "pixKey": "TR7NHq…jLj6t",
+      "maskedPixKey": "TR7NHq…jLj6t",
+      "destination": "crypto_wallet",
+      "crypto": {
+        "walletId": "6f0a2c1e-8b4d-4c7a-9e21-3d5b7f9a1c02",
+        "network": "trc20",
+        "networkLabel": "TRON (TRC20)",
+        "usdtAmountMinor": 9100000,
+        "usdtFeeMinor": 1000000,
+        "rate": 5.45,
+        "txHash": "a1b2c3d4e5f6…",
+        "txUrl": "https://tronscan.org/#/transaction/a1b2c3d4e5f6…"
+      },
+      "requestedVia": "api",
+      "status": "paid",
+      "payoutMode": "auto",
+      "trigger": "manual",
+      "requestedAt": "2026-11-11T15:02:11.000Z",
+      "paidAt": "2026-11-11T15:04:37.000Z",
+      "payoutReference": "a1b2c3d4e5f6…"
+    },
+    {
+      "id": "a1b2c3d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+      "amountCents": 100000,
+      "feeCents": 367,
+      "netCents": 99633,
+      "pixKeyType": "cnpj",
+      "pixKey": "12.***.***/0001-90",
+      "maskedPixKey": "12.***.***/0001-90",
+      "destination": "banking",
+      "requestedVia": "panel",
+      "status": "paid",
+      "payoutMode": "auto",
+      "trigger": "rule_schedule",
+      "requestedAt": "2026-11-04T21:00:00.000Z",
+      "paidAt": "2026-11-04T21:00:41.000Z",
+      "payoutReference": "E00000000202611042100abcdef123456"
+    }
+  ]
+}
+```
+</ResponseExample>
+
+<Note>
+  Com chave de API, `pixKey` vem **mascarado** (igual a `maskedPixKey`), tanto para chave Pix quanto para carteira USDT. O valor completo só aparece no painel, para o titular.
+</Note>
+
+## Status de um saque
+
+| `status` | Significado |
+| :--- | :--- |
+| `analyzing` | Em revisão pela equipe Azipix. |
+| `processing` | Sendo enviado automaticamente (Pix pela conta de saída, USDT pela Zendry). |
+| `under_review` | Envio automático em conferência (o resultado está sendo confirmado com a adquirente). |
+| `approved` | Aprovado, aguardando o envio. |
+| `paid` | Pago. `payoutReference` traz o E2E do Pix, o comprovante ou o hash da transação USDT. |
+| `rejected` | Recusado. `rejectionReason` explica o motivo e o valor volta ao saldo. |
+| `failed` | Não enviado. O valor volta ao saldo. |
+
+## Outros campos
+
+<ResponseField name="destination" type="string">`banking` (chave validada da conta), `pix_key` (chave digitada no painel) ou `crypto_wallet` (USDT para carteira cadastrada).</ResponseField>
+<ResponseField name="crypto" type="object">Só em saques USDT: rede, valor em USDT, taxa, cotação e transação. Detalhes em [Consultar saque](/api-reference/balance/withdrawal).</ResponseField>
+<ResponseField name="requestedVia" type="string">`panel` (pedido no painel ou por regra) ou `api` (pedido por uma chave de API).</ResponseField>
+<ResponseField name="payoutMode" type="string">`manual` (pago ou enviado após revisão da equipe) ou `auto` (enviado automaticamente).</ResponseField>
+<ResponseField name="trigger" type="string">Origem: `manual` (pedido avulso, no painel ou pela API), `rule_threshold` ("quando o saldo chegar a R$ X") ou `rule_schedule` ("todo dia às HH:MM").</ResponseField>

@@ -1,0 +1,67 @@
+---
+title: "Ambientes e testes"
+description: "Produção e sandbox, como testar Pix, cartão e webhooks antes de ir ao ar."
+---
+
+## Produção e sandbox
+
+O ambiente é definido pela **chave**, não pela URL. A URL base é sempre `https://api.azipix.com/api`.
+
+| | Produção | Sandbox (testes) |
+| :--- | :--- | :--- |
+| Credenciais | `pk_live_…` / `sk_live_…` | `pk_test_…` / `sk_test_…` |
+| Contas de recebimento | As contas reais liberadas para você | Somente contas **de teste** liberadas para você |
+| Dinheiro | Real | Simulado pela adquirente |
+
+Uma chave de teste **nunca** cobra numa conta de produção. Se não houver conta de teste liberada para a sua loja, a cobrança é recusada com a mensagem:
+
+```json
+{ "error": "Nenhuma conta de adquirente em ambiente de testes (sandbox) está liberada. Use uma chave de produção ou peça ao administrador uma conta sandbox." }
+```
+
+<Note>
+  As vendas de teste aparecem no seu painel como qualquer venda. Use descrições como `TESTE` para separá-las.
+</Note>
+
+## Testando Pix
+
+- **Sandbox:** depende da adquirente da conta de teste. Algumas confirmam sozinhas, outras oferecem um botão de simulação no painel delas.
+- **Produção:** crie um Pix de **R$ 1,00** (valor mínimo) e pague com o app do seu banco. Você recebe o `payment.paid` em segundos.
+
+## Testando cartão
+
+Depende de quem processa cartão na sua conta ([como descobrir](/api-reference/account/routing)):
+
+<Tabs>
+  <Tab title="Mercado Pago">
+    Use os [cartões de teste do Mercado Pago](https://www.mercadopago.com.br/developers/pt/docs/checkout-api/integration-test/test-cards) com uma conta de teste do Mercado Pago. O nome do titular define o resultado (ex.: `APRO` aprova, `OTHE` recusa).
+  </Tab>
+  <Tab title="Zendry">
+    Na conta de teste (chave Zendry `gw_test_…`):
+
+    | Cartão | Resultado |
+    | :--- | :--- |
+    | `4000 0000 0000 0002` | Recusado |
+    | Qualquer outro número válido (ex.: `4111 1111 1111 1111`) | Aprovado |
+
+    No sandbox a autorização é simulada e **não há desafio 3DS**: o desafio do banco só acontece em produção. Estornos também são simulados.
+  </Tab>
+</Tabs>
+
+## Testando webhooks
+
+1. Exponha seu servidor local com um túnel (ngrok, Cloudflare Tunnel) e cadastre a URL `https://` gerada em **Integrações → Webhooks**.
+2. Crie uma cobrança e pague (ou aprove o cartão de teste).
+3. Confira a assinatura com o segredo `whsec_…` antes de processar. Veja [Validação da assinatura](/webhooks/signature).
+
+<Warning>
+  Cada evento é enviado **uma vez**, com até 8 segundos de espera. Se o seu servidor estiver fora do ar, consulte a cobrança pela API ([plano B](/api-reference/charges/get-charge)).
+</Warning>
+
+## Checklist para ir ao ar
+
+- [ ] Credenciais `sk_live_…` só no servidor, em variável de ambiente.
+- [ ] `X-Idempotency-Key` em toda criação de cobrança. Veja [Idempotência](/idempotency).
+- [ ] Webhook com validação da assinatura e processamento idempotente.
+- [ ] Conciliação periódica dos pedidos pendentes pela API, ou pelo [feed de vendas](/api-reference/charges/feed).
+- [ ] Mensagens de erro tratadas (ver [Erros e limites](/errors)).

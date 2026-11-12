@@ -1,40 +1,80 @@
 ---
 title: "Erros e Limites"
-description: "Códigos de resposta, formato dos erros e limites de uso."
+description: "Formato dos erros, códigos HTTP, mensagens frequentes e limites de uso."
 ---
 
-## Formato
+## Formatos
 
-```json
+<CodeGroup>
+
+```json Validação (400)
 {
   "statusCode": 400,
   "error": "Validation failed",
-  "errors": { "customer": ["CPF ou CNPJ inválido"] }
+  "errors": {
+    "customer": ["CPF ou CNPJ inválido"],
+    "card": ["Número do cartão inválido."]
+  }
 }
 ```
 
-Erros de regra de negócio vêm com a mensagem em `error` ou `message`, prontas para exibir no seu painel interno.
+```json Regra de negócio (400)
+{
+  "error": "Cartão de crédito não está habilitado para sua conta."
+}
+```
 
-## Códigos
+```json Autenticação e permissão (401/403)
+{
+  "statusCode": 403,
+  "error": "InsufficientScope",
+  "message": "Esta chave de API não tem o escopo 'chargebacks:read'."
+}
+```
+
+```json Erro interno (500)
+{
+  "statusCode": 500,
+  "error": "InternalServerError",
+  "message": "Erro interno. Tente novamente em instantes."
+}
+```
+
+</CodeGroup>
+
+As mensagens em `error` e `message` estão em português e podem ser exibidas no seu painel interno. Nunca mostram dados de cartão.
+
+## Códigos HTTP
 
 | Status | Quando |
 | :--- | :--- |
-| `200` / `201` | Sucesso. |
-| `400` | Dados inválidos (CPF/CNPJ inválido, valor fora do limite, método não liberado, cartão sem `cardToken`...). |
-| `401` | Chave de API ausente, inválida ou revogada. |
-| `403` | Conta não aprovada (`AccountNotApproved`), bloqueada (`AccountBlocked`) ou recurso de outra conta. |
-| `404` | Cobrança não encontrada. |
-| `429` | Muitas requisições. Aguarde e tente de novo. |
-| `500` | Erro interno. Tente de novo com a **mesma** `X-Idempotency-Key`: se a cobrança já tiver sido criada, você recebe a original. |
+| `200` / `201` | Sucesso. Uma cobrança de cartão **recusada** também volta `201`, com `status: "failed"`. |
+| `400` | Dados inválidos ou regra de negócio (método não liberado, valor fora do limite, dados de cartão incompatíveis com a conta…). |
+| `401` | Credencial ausente, inválida, expirada ou revogada. |
+| `403` | Conta não aprovada ou bloqueada, escopo insuficiente, ou operação só permitida no painel. |
+| `404` | Recurso não encontrado, ou de outra conta (para não revelar IDs alheios). |
+| `409` | Requisição idêntica em andamento (`IdempotencyInProgress`) ou pagamento já em processamento (`PaymentInProgress`). |
+| `422` | Chave de idempotência reutilizada com outro corpo (`IdempotencyKeyReused`). |
+| `429` | Limite de requisições excedido. Aguarde e repita. |
+| `500` | Erro interno. Repita com a **mesma** `X-Idempotency-Key`: se a cobrança já existir, você recebe a original. |
+| `503` | Serviço temporariamente indisponível (ex.: `IdempotencyUnavailable`). Nada foi cobrado. |
 
 ## Mensagens frequentes
 
 | Mensagem | O que fazer |
 | :--- | :--- |
 | `Cartão de crédito não está habilitado para sua conta.` | Solicite a liberação ao suporte Azipix. |
-| `Pix está desativado em Integrações.` | Ative o Pix em **Integrações** no painel. |
-| `Envie o cardToken gerado pelo MercadoPago.js` | Tokenize o cartão no navegador. Veja [Cartão](/api-reference/charges/create-card). |
-| `O valor da cobrança precisa ser maior que a tarifa.` | Aumente o valor da cobrança. |
+| `Pix está desativado em Integrações. Ative-o para receber.` | Ative o Pix em **Integrações** no painel. |
+| `Envie o cardToken (Mercado Pago) ou os dados do cartão em 'card'` | Cobrança de cartão sem dados do cartão. Veja [Cartão](/api-reference/charges/create-card). |
+| `Esta conta processa cartão pela Zendry: envie os dados do cartão em 'card'…` | Sua conta de cartão usa o fluxo com 3DS: envie `card`, não `cardToken`. |
+| `Esta conta não recebe dados de cartão: tokenize o cartão no navegador e envie o cardToken.` | Sua conta de cartão tokeniza no navegador: envie `cardToken`. |
+| `Para pagar com cartão, informe o CPF do comprador (11 dígitos).` | O fluxo com 3DS exige CPF; CNPJ não é aceito como titular. |
+| `Nenhuma conta de adquirente em ambiente de testes (sandbox) está liberada…` | Você usou uma chave `sk_test_…` sem conta de teste liberada. Veja [Ambientes](/environments). |
+| `Não foi possível gerar o pagamento agora. Tente novamente em instantes.` | Instabilidade na adquirente. Repita com a mesma chave de idempotência. |
+| `Saldo disponível insuficiente. Seu saldo disponível é de R$ …` | O saque pedido é maior que o saldo disponível. Consulte [Saldos](/api-reference/balance/balances). |
+| `Pela API o saque vai para a chave Banking da conta…` (`DestinationNotAllowed`) | Pela API, use `destination: "banking"` ou `"crypto_wallet"` com um `walletId`. Veja [Solicitar saque](/api-reference/balance/request-withdrawal). |
+| `Carteira não encontrada. Cadastre-a no painel em Saques → Sacar via USDT.` (`WalletNotFound`) | O `walletId` foi removido ou não é da sua conta. Liste em [Destinos de saque](/api-reference/balance/destinations). |
+| `Saques só podem ser solicitados com uma chave de produção.` (`SandboxNotSupported`) | Use uma chave `sk_live_…` com o escopo `withdrawals:write`. |
 
 ## Limites
 
@@ -42,7 +82,26 @@ Erros de regra de negócio vêm com a mensagem em `error` ou `message`, prontas 
 | :--- | :--- |
 | Valor por cobrança | R$ 1,00 a R$ 100.000,00 |
 | Parcelas no cartão | 1 a 12 |
-| Requisições | 100 por minuto por IP |
-| Webhooks cadastrados | 5 URLs |
-| Chaves de API ativas | 10 |
+| Requisições com chave de API | 300 por minuto, por chave |
+| Requisições sem chave (painel, checkout público) | 100 por minuto, por IP |
+| Pagamento no checkout público | 10 por minuto, por IP |
+| Sincronizar chargeback | 10 por minuto |
+| Enviar documento de chargeback | 20 por minuto · até 10 MB por arquivo |
+| Enviar defesa de chargeback | 5 por minuto |
+| Solicitar saque | 5 a cada 10 minutos, por chave |
+| Saque mínimo | R$ 10,00 |
+| Carteiras USDT ativas | 5 por conta (cadastro só no painel) |
+| Chaves de API ativas | 20 por conta |
+| URLs de webhook | 5 por conta (e 5 por subconta) |
 | Idempotência | 24 horas por chave |
+| Lista de cobranças | As 1.000 mais recentes (use o [feed](/api-reference/charges/feed) para conciliar) |
+
+Ao passar do limite, a API responde `429`:
+
+```json
+{
+  "statusCode": 429,
+  "error": "Too Many Requests",
+  "message": "Rate limit exceeded, retry in 1 minute"
+}
+```

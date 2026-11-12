@@ -1,0 +1,183 @@
+---
+title: "Solicitar saque"
+api: "POST /api/withdrawals"
+description: "Saque por Pix para a chave Banking da conta ou em USDT para uma carteira cadastrada no painel."
+---
+
+Escopo exigido: `withdrawals:write`.
+
+O seu sistema pode pedir saques do saldo disponível, de dois jeitos:
+
+- **Pix** para a **chave Banking validada da própria conta** (`destination: "banking"`);
+- **USDT** para uma **carteira já cadastrada no painel** (`destination: "crypto_wallet"`). A Zendry converte o valor e envia na rede da carteira.
+
+<Warning>
+  **Pela API não existe destino novo.** A chave não envia chave Pix digitada nem endereço de carteira: só o tipo de destino e, no USDT, o `walletId` de uma carteira que o titular cadastrou no painel, com senha. Assim, uma chave vazada não consegue mandar dinheiro para terceiros.
+</Warning>
+
+## Antes de começar
+
+<Steps>
+  <Step title="Crie uma chave com o escopo de saque">
+    Em **Integrações → Chaves de API → Nova credencial**, marque **Solicitar saques** (`withdrawals:write`). Esse escopo só vale em chave de **produção** da **conta inteira** (sem subconta), nunca é padrão, e criar ou rotacionar uma chave com ele pede a senha da conta.
+  </Step>
+  <Step title="Tenha o destino cadastrado">
+    Para Pix: uma chave validada em **Banking**. Para USDT: uma carteira em **Saques → Sacar via USDT**. Consulte os destinos disponíveis em [Destinos de saque](/api-reference/balance/destinations).
+  </Step>
+  <Step title="Envie sempre X-Idempotency-Key">
+    Toda solicitação de saque pela API exige o cabeçalho. Repetir a mesma chave com o mesmo corpo devolve o saque original, nunca cria outro. Veja [Idempotência](/idempotency).
+  </Step>
+</Steps>
+
+## Cabeçalhos
+
+<ParamField header="X-Idempotency-Key" type="string" required>
+  Valor único por **tentativa de saque** (um UUID v4, por exemplo), até 150 caracteres. Use a mesma chave ao repetir após um timeout.
+</ParamField>
+
+## Corpo
+
+<ParamField body="destination" type="string" required>
+  `banking` (Pix para a chave Banking da conta) ou `crypto_wallet` (USDT para uma carteira cadastrada).
+</ParamField>
+
+<ParamField body="amountCents" type="integer" required>
+  Valor debitado do saldo, em centavos (mínimo `1000`, R$ 10,00). A tarifa de saque sai desse valor. Consulte antes em `GET /api/withdrawals/quote?amountCents=`.
+</ParamField>
+
+<ParamField body="walletId" type="string">
+  Obrigatório quando `destination` é `crypto_wallet`: o `walletId` de uma carteira **ativa** da sua conta (veja [Destinos de saque](/api-reference/balance/destinations)). Nenhum outro campo é aceito.
+</ParamField>
+
+<RequestExample>
+```bash Pix (chave Banking)
+curl --request POST https://api.azipix.com/api/withdrawals \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA' \
+  --header 'X-Idempotency-Key: saque-2026-11-11-0001' \
+  --header 'Content-Type: application/json' \
+  --data '{ "destination": "banking", "amountCents": 150000 }'
+```
+
+```bash USDT (carteira cadastrada)
+curl --request POST https://api.azipix.com/api/withdrawals \
+  --header 'x-api-key: pk_live_SEU_ID' \
+  --header 'x-api-secret: sk_live_SUA_CHAVE_SECRETA' \
+  --header 'X-Idempotency-Key: saque-usdt-2026-11-11-0001' \
+  --header 'Content-Type: application/json' \
+  --data '{ "destination": "crypto_wallet", "amountCents": 50000, "walletId": "6f0a2c1e-8b4d-4c7a-9e21-3d5b7f9a1c02" }'
+```
+
+```javascript Node.js
+const res = await fetch("https://api.azipix.com/api/withdrawals", {
+  method: "POST",
+  headers: {
+    "x-api-key": process.env.AZIPIX_KEY_ID,
+    "x-api-secret": process.env.AZIPIX_SECRET_KEY,
+    "Content-Type": "application/json",
+    "X-Idempotency-Key": withdrawalAttemptId, // a MESMA chave nas repetições
+  },
+  body: JSON.stringify({ destination: "crypto_wallet", amountCents: 50000, walletId }),
+});
+const { data } = await res.json(); // data.id → acompanhe em GET /api/withdrawals/{id}
+```
+</RequestExample>
+
+<ResponseExample>
+```json 201 USDT
+{
+  "success": true,
+  "message": "Saque em USDT solicitado com sucesso.",
+  "data": {
+    "id": "c0ffee00-1d2c-4b3a-8e9f-0a1b2c3d4e5f",
+    "amountCents": 50000,
+    "feeCents": 367,
+    "netCents": 49633,
+    "pixKeyType": "usdt_trc20",
+    "pixKey": "TR7NHq…jLj6t",
+    "maskedPixKey": "TR7NHq…jLj6t",
+    "destination": "crypto_wallet",
+    "crypto": {
+      "walletId": "6f0a2c1e-8b4d-4c7a-9e21-3d5b7f9a1c02",
+      "network": "trc20",
+      "networkLabel": "TRON (TRC20)",
+      "usdtAmountMinor": null,
+      "usdtFeeMinor": null,
+      "rate": null,
+      "txHash": null,
+      "txUrl": null
+    },
+    "requestedVia": "api",
+    "status": "processing",
+    "payoutMode": "auto",
+    "trigger": "manual",
+    "requestedAt": "2026-11-11T15:02:11.000Z"
+  }
+}
+```
+
+```json 201 Pix
+{
+  "success": true,
+  "message": "Solicitação de saque enviada com sucesso para processamento Pix.",
+  "data": {
+    "id": "b7e2c9d0-4a1f-4e3b-9c8d-7f6a5b4c3d2e",
+    "amountCents": 150000,
+    "feeCents": 367,
+    "netCents": 149633,
+    "pixKeyType": "cnpj",
+    "pixKey": "12.***.***/0001-90",
+    "maskedPixKey": "12.***.***/0001-90",
+    "destination": "banking",
+    "requestedVia": "api",
+    "status": "analyzing",
+    "payoutMode": "manual",
+    "trigger": "manual",
+    "requestedAt": "2026-11-11T15:02:11.000Z"
+  }
+}
+```
+
+```json 400 destino não permitido
+{
+  "statusCode": 400,
+  "error": "Pela API o saque vai para a chave Banking da conta (destination \"banking\") ou para uma carteira USDT cadastrada no painel (destination \"crypto_wallet\").",
+  "message": "Pela API o saque vai para a chave Banking da conta (destination \"banking\") ou para uma carteira USDT cadastrada no painel (destination \"crypto_wallet\").",
+  "code": "DestinationNotAllowed"
+}
+```
+</ResponseExample>
+
+## O que acontece depois
+
+O valor é **debitado do saldo na hora**, numa operação atômica que confere o saldo disponível. Em seguida:
+
+- **Sai sozinho** (`status: "processing"`, `payoutMode: "auto"`) quando o saque automático está liberado para a sua conta e todas as regras passam;
+- **Vai para a revisão da equipe** (`status: "analyzing"`) em qualquer outro caso. Nada é recusado por isso: o pedido continua válido.
+
+No USDT, as regras são mais rígidas: uma carteira nova passa por uma **carência** (48 h por padrão) e o **primeiro saque para cada carteira** é conferido pela equipe. Também há limites por saque e por dia próprios do USDT.
+
+Acompanhe o resultado em [Consultar saque](/api-reference/balance/withdrawal). Se o envio falhar (`failed`) ou for recusado (`rejected`), o valor volta ao saldo automaticamente.
+
+<Info>
+  **USDT é irreversível.** A Azipix envia cada saque em USDT uma única vez. Se a Zendry não confirmar o envio, o saque fica em `under_review` até a equipe conferir. Ele nunca é reenviado às cegas.
+</Info>
+
+## Erros específicos
+
+| Status | `code` | Quando |
+| :--- | :--- | :--- |
+| `400` | `IdempotencyKeyRequired` | Faltou o cabeçalho `X-Idempotency-Key`. |
+| `400` | `DestinationNotAllowed` | Destino diferente de `banking` ou `crypto_wallet` (ex.: chave Pix digitada). |
+| `400` | `Validation` | Corpo inválido: valor abaixo de R$ 10,00, `walletId` fora do formato, campo extra. |
+| `400` | — | Saldo disponível insuficiente (a mensagem informa o saldo). |
+| `400` | `NoBankingKey` / `KeyNotValidated` | Sem chave Banking validada para o saque Pix. |
+| `403` | `InsufficientScope` | A chave não tem `withdrawals:write`. |
+| `403` | `SandboxNotSupported` | Chave de testes (`sk_test_…`): saques só com chave de produção. |
+| `403` | `SubaccountKeyNotAllowed` | Chave vinculada a uma subconta. |
+| `403` | `UsdtDisabled` | O saque em USDT não está liberado para a sua conta. |
+| `404` | `WalletNotFound` | `walletId` inexistente, removido ou de outra conta. |
+| `409` | `IdempotencyInProgress` | Um pedido idêntico ainda está sendo processado. |
+| `422` | `IdempotencyKeyReused` | A mesma chave foi usada com outro corpo. |
+| `429` | — | Mais de 5 solicitações de saque em 10 minutos para a mesma chave. |
+| `503` | `MigrationPending` | Saque em USDT ainda não ativado no servidor. |

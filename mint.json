@@ -39,6 +39,8 @@
         "introduction",
         "quickstart",
         "authentication",
+        "environments",
+        "idempotency",
         "errors"
       ]
     },
@@ -48,7 +50,41 @@
         "api-reference/charges/create-pix",
         "api-reference/charges/create-card",
         "api-reference/charges/get-charge",
-        "api-reference/charges/list-charges"
+        "api-reference/charges/list-charges",
+        "api-reference/charges/feed",
+        "api-reference/charges/receipt"
+      ]
+    },
+    {
+      "group": "Links de Pagamento",
+      "pages": [
+        "api-reference/payment-links/create",
+        "api-reference/payment-links/manage"
+      ]
+    },
+    {
+      "group": "Saldo e Saques",
+      "pages": [
+        "api-reference/balance/balances",
+        "api-reference/balance/statement",
+        "api-reference/balance/withdrawals",
+        "api-reference/balance/request-withdrawal",
+        "api-reference/balance/withdrawal",
+        "api-reference/balance/destinations"
+      ]
+    },
+    {
+      "group": "Conta",
+      "pages": [
+        "api-reference/account/routing",
+        "api-reference/account/subaccounts"
+      ]
+    },
+    {
+      "group": "Chargebacks e MED",
+      "pages": [
+        "api-reference/chargebacks/list",
+        "api-reference/chargebacks/defense"
       ]
     },
     {

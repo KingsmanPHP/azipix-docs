@@ -19,7 +19,7 @@ Qualquer pessoa que descubra a sua URL pode enviar um `POST` falso para ela. Por
 assinatura = HMAC_SHA256( segredo, timestamp + "." + corpo_bruto )
 ```
 
-- `segredo`: o **Segredo** exibido em **Integrações → Webhooks** (começa com `whsec_`).
+- `segredo`: o **segredo** exibido em **Integrações → Webhooks** (começa com `whsec_`), também disponível em [`GET /transactions/routing`](/api-reference/account/routing). Para vendas de uma [subconta](/api-reference/account/subaccounts), use o **segredo da subconta** (painel → Subcontas).
 - `timestamp`: o valor do cabeçalho `X-Azipix-Timestamp`.
 - `corpo_bruto`: o corpo da requisição **exatamente como recebido** (bytes/texto original). Não use `JSON.stringify(req.body)`: reformatar o JSON muda a assinatura.
 
@@ -114,3 +114,9 @@ http_response_code(200);
 <Warning>
   Nunca coloque o segredo no front-end nem no repositório. Guarde-o como variável de ambiente do seu servidor.
 </Warning>
+
+## Dicas
+
+- Se você recebe vendas da conta principal **e** de subcontas na mesma URL, escolha o segredo pelo campo `data.subaccountId` antes de validar: `null` usa o segredo da conta, um ID usa o segredo daquela subconta.
+- Responda `200` mesmo para eventos que você não usa, depois de validar a assinatura.
+- Registre o `X-Azipix-Event` e o `data.id` de cada chamada recebida: ajuda a investigar diferenças na conciliação.

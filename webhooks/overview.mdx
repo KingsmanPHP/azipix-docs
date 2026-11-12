@@ -1,15 +1,21 @@
 ---
 title: "Visão Geral"
-description: "Receba no seu servidor a confirmação de pagamentos, recusas e estornos."
+description: "Receba no seu servidor a confirmação de pagamentos, recusas, estornos e chargebacks."
 ---
 
-Um webhook é uma chamada `POST` que a Azipix faz para uma URL do **seu servidor** sempre que uma cobrança muda de status. É assim que você fica sabendo, sem precisar ficar consultando a API, que um Pix foi pago.
+Um webhook é uma chamada `POST` que a Azipix faz para uma URL do **seu servidor** sempre que algo muda numa venda. É assim que você fica sabendo, sem consultar a API sem parar, que um Pix foi pago ou que um cartão em análise foi aprovado.
 
 ## Configuração
 
 1. No painel, vá em **Integrações → Webhooks → Adicionar URL**.
-2. Informe uma URL **https** do seu servidor (ex.: `https://sualoja.com/webhooks/azipix`). Você pode cadastrar até 5.
-3. Copie o **Segredo** exibido na mesma tela. Ele serve para [validar a assinatura](/webhooks/signature) de cada chamada.
+2. Informe uma URL **https** do seu servidor (ex.: `https://sualoja.com/webhooks/azipix`). Até 5 URLs por conta.
+3. Copie o **segredo** (`whsec_…`) exibido na mesma tela. Ele serve para [validar a assinatura](/webhooks/signature). Você também o obtém em [`GET /transactions/routing`](/api-reference/account/routing).
+
+Todos os eventos são enviados para todas as URLs ativas.
+
+<Note>
+  Vendas de uma [subconta](/api-reference/account/subaccounts) vão **só** para as URLs da subconta, assinadas com o segredo da subconta.
+</Note>
 
 ## Como funciona
 
@@ -23,13 +29,13 @@ sequenceDiagram
 
     Comprador->>Banco: Paga o Pix / cartão
     Banco->>Azipix: Notifica o pagamento
-    Azipix->>Banco: Confirma o pagamento direto na API do adquirente (e confere o valor)
-    Note over Azipix: Marca a cobrança como paga e credita seu saldo
+    Azipix->>Banco: Confirma o pagamento direto na API da adquirente (e confere o valor)
+    Note over Azipix: Marca a venda como paga e credita o seu saldo
     Azipix->>Voce: POST sua URL — evento payment.paid (assinado)
     Voce-->>Azipix: HTTP 200
 ```
 
-A Azipix **só envia `payment.paid` depois de confirmar o pagamento na API do adquirente** e conferir que o valor pago é igual ao valor cobrado. Você pode liberar o pedido com segurança ao receber o evento, desde que a [assinatura seja válida](/webhooks/signature).
+A Azipix **nunca confia só no aviso da adquirente**: o pagamento é relido na API dela e o valor pago é conferido com o valor cobrado antes de enviar `payment.paid`. Você pode liberar o pedido ao receber o evento, desde que a [assinatura seja válida](/webhooks/signature).
 
 ## O que a sua URL recebe
 
@@ -46,11 +52,12 @@ X-Azipix-Signature: sha256=5d2c1f0a9e...
 {
   "event": "payment.paid",
   "data": {
+    "subaccountId": null,
     "id": "tx_8F3A1C9B2D7E4F60",
     "amount": 150,
     "amountCents": 15000,
-    "feeCents": 179,
     "netCents": 14821,
+    "feeCents": 179,
     "paymentMethod": "pix",
     "status": "paid",
     "customer": {
@@ -70,12 +77,13 @@ Veja todos os eventos em [Eventos](/webhooks/events).
 
 - Responda **HTTP 2xx em até 8 segundos**. Se o seu processamento for demorado, salve o evento numa fila, responda `200` na hora e processe depois.
 - **Seja idempotente:** use `data.id` + `event` como chave. Se o mesmo evento chegar duas vezes, ignore o segundo.
-- **Não confie só no webhook para cancelar pedidos.** Se uma notificação não chegar (seu servidor fora do ar, por exemplo), consulte `GET /transactions/{id}` antes de cancelar um pedido pendente.
+- **Valide a assinatura** antes de qualquer ação. Veja [Validação da assinatura](/webhooks/signature).
+- **Não confie só no webhook para cancelar pedidos.** Antes de cancelar um pedido pendente, consulte [`GET /transactions/{id}`](/api-reference/charges/get-charge).
 
 <Warning>
-  Hoje cada evento é enviado **uma vez**. Se a sua URL estiver fora do ar ou demorar mais de 8 segundos, a notificação se perde. Por isso, faça uma conciliação periódica: consulte pela API os pedidos que continuam pendentes.
+  Hoje cada evento é enviado **uma vez**, sem novas tentativas. Se a sua URL estiver fora do ar ou demorar mais de 8 segundos, a notificação se perde. Por isso, faça uma conciliação periódica: use o [feed de vendas](/api-reference/charges/feed) ou consulte os pedidos que continuam pendentes.
 </Warning>
 
 ## Testando localmente
 
-Para receber webhooks no seu computador, exponha a porta local com um túnel (ngrok, Cloudflare Tunnel) e cadastre a URL `https://` gerada em **Integrações → Webhooks**. Depois, crie uma cobrança Pix de R$ 1,00 e pague.
+Exponha a porta local com um túnel (ngrok, Cloudflare Tunnel) e cadastre a URL `https://` gerada em **Integrações → Webhooks**. Depois, crie uma cobrança e pague. Veja [Ambientes e testes](/environments).
