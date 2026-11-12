@@ -7,8 +7,7 @@ description: "Quais métodos de pagamento estão ativos e quais contas de recebi
 Qualquer chave válida pode consultar. Use para:
 
 - saber se Pix e cartão estão liberados e ativos antes de mostrar as opções no seu checkout;
-- descobrir **como enviar o cartão** (token ou cartão + 3DS) — veja [Cartão](/api-reference/charges/create-card);
-- obter a `publicKey` para tokenizar cartões no navegador (contas Mercado Pago).
+- ver qual conta processa cada método. Cartão é sempre processado pela Zendry: veja [Cartão](/api-reference/charges/create-card).
 
 ```bash
 curl https://api.azipix.com/api/transactions/routing \
@@ -39,18 +38,16 @@ curl https://api.azipix.com/api/transactions/routing \
       "name": "Conta Pix",
       "environment": "production",
       "status": "active",
-      "supportedMethods": ["pix", "credit_card"],
-      "publicKey": null
+      "supportedMethods": ["pix"]
     },
     {
       "id": "acc_2b9c…",
-      "provider": "mercadopago",
-      "providerLabel": "Mercado Pago",
+      "provider": "zendry",
+      "providerLabel": "Zendry",
       "name": "Conta Cartão",
       "environment": "production",
       "status": "active",
-      "supportedMethods": ["pix", "credit_card"],
-      "publicKey": "APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+      "supportedMethods": ["pix", "credit_card"]
     }
   ],
   "webhookSecret": "whsec_••••••••••••••••••••••••••••••••••••••••"
@@ -67,10 +64,9 @@ curl https://api.azipix.com/api/transactions/routing \
 <ResponseField name="routing.cardProvider" type="string">Conta escolhida para processar cartão (pode vir como `provedor:id`).</ResponseField>
 <ResponseField name="accounts" type="object[]">Contas de recebimento liberadas para você, com os métodos que cada uma processa.</ResponseField>
 <ResponseField name="accounts[].provider" type="string">
-  Quem processa. Para cartão, define o fluxo: `mercadopago` (token no navegador) ou `zendry` (cartão + 3DS).
+  Quem processa. Só contas `zendry` processam cartão.
 </ResponseField>
 <ResponseField name="accounts[].environment" type="string">`production` ou `sandbox`. Chaves de teste só usam contas `sandbox`.</ResponseField>
-<ResponseField name="accounts[].publicKey" type="string">Chave pública para tokenizar cartões (só contas Mercado Pago). É pública por natureza.</ResponseField>
 <ResponseField name="webhookSecret" type="string">Segredo `whsec_…` para validar a [assinatura dos webhooks](/webhooks/signature) da conta principal.</ResponseField>
 
 <Note>

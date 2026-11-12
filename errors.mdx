@@ -49,7 +49,7 @@ As mensagens em `error` e `message` estão em português e podem ser exibidas no
 | Status | Quando |
 | :--- | :--- |
 | `200` / `201` | Sucesso. Uma cobrança de cartão **recusada** também volta `201`, com `status: "failed"`. |
-| `400` | Dados inválidos ou regra de negócio (método não liberado, valor fora do limite, dados de cartão incompatíveis com a conta…). |
+| `400` | Dados inválidos ou regra de negócio (método não liberado, valor fora do limite, cartão sem os dados em `card`…). |
 | `401` | Credencial ausente, inválida, expirada ou revogada. |
 | `403` | Conta não aprovada ou bloqueada, escopo insuficiente, ou operação só permitida no painel. |
 | `404` | Recurso não encontrado, ou de outra conta (para não revelar IDs alheios). |
@@ -65,10 +65,8 @@ As mensagens em `error` e `message` estão em português e podem ser exibidas no
 | :--- | :--- |
 | `Cartão de crédito não está habilitado para sua conta.` | Solicite a liberação ao suporte Azipix. |
 | `Pix está desativado em Integrações. Ative-o para receber.` | Ative o Pix em **Integrações** no painel. |
-| `Envie o cardToken (Mercado Pago) ou os dados do cartão em 'card'` | Cobrança de cartão sem dados do cartão. Veja [Cartão](/api-reference/charges/create-card). |
-| `Esta conta processa cartão pela Zendry: envie os dados do cartão em 'card'…` | Sua conta de cartão usa o fluxo com 3DS: envie `card`, não `cardToken`. |
-| `Esta conta não recebe dados de cartão: tokenize o cartão no navegador e envie o cardToken.` | Sua conta de cartão tokeniza no navegador: envie `cardToken`. |
-| `Para pagar com cartão, informe o CPF do comprador (11 dígitos).` | O fluxo com 3DS exige CPF; CNPJ não é aceito como titular. |
+| `Envie os dados do cartão em 'card'` | Cobrança de cartão sem os dados do cartão. Veja [Cartão](/api-reference/charges/create-card). |
+| `Para pagar com cartão, informe o CPF do comprador (11 dígitos).` | O cartão exige CPF; CNPJ não é aceito como titular. |
 | `Nenhuma conta de adquirente em ambiente de testes (sandbox) está liberada…` | Você usou uma chave `sk_test_…` sem conta de teste liberada. Veja [Ambientes](/environments). |
 | `Não foi possível gerar o pagamento agora. Tente novamente em instantes.` | Instabilidade na adquirente. Repita com a mesma chave de idempotência. |
 | `Saldo disponível insuficiente. Seu saldo disponível é de R$ …` | O saque pedido é maior que o saldo disponível. Consulte [Saldos](/api-reference/balance/balances). |

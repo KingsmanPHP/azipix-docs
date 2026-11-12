@@ -30,23 +30,14 @@ Uma chave de teste **nunca** cobra numa conta de produção. Se não houver cont
 
 ## Testando cartão
 
-Depende de quem processa cartão na sua conta ([como descobrir](/api-reference/account/routing)):
+Cartão é processado pela Zendry. Na conta de teste (chave Zendry `gw_test_…`):
 
-<Tabs>
-  <Tab title="Mercado Pago">
-    Use os [cartões de teste do Mercado Pago](https://www.mercadopago.com.br/developers/pt/docs/checkout-api/integration-test/test-cards) com uma conta de teste do Mercado Pago. O nome do titular define o resultado (ex.: `APRO` aprova, `OTHE` recusa).
-  </Tab>
-  <Tab title="Zendry">
-    Na conta de teste (chave Zendry `gw_test_…`):
+| Cartão | Resultado |
+| :--- | :--- |
+| `4000 0000 0000 0002` | Recusado |
+| Qualquer outro número válido (ex.: `4111 1111 1111 1111`) | Aprovado |
 
-    | Cartão | Resultado |
-    | :--- | :--- |
-    | `4000 0000 0000 0002` | Recusado |
-    | Qualquer outro número válido (ex.: `4111 1111 1111 1111`) | Aprovado |
-
-    No sandbox a autorização é simulada e **não há desafio 3DS**: o desafio do banco só acontece em produção. Estornos também são simulados.
-  </Tab>
-</Tabs>
+No sandbox a autorização é simulada e **não há desafio 3DS**: o desafio do banco só acontece em produção. Estornos também são simulados.
 
 ## Testando webhooks
 

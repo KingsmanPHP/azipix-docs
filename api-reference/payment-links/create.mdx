@@ -92,5 +92,5 @@ curl --request POST \
 Compartilhe `https://azipix.com/pay/{slug}` (no exemplo, `https://azipix.com/pay/pay_k3x9a1b2c3d4`). O `slug` é gerado pela Azipix. Cada pagamento vira uma cobrança comum: aparece em [Listar Cobranças](/api-reference/charges/list-charges), com a descrição `Link de Pagamento: {title}`, e dispara os [webhooks](/webhooks/events).
 
 <Tip>
-  No checkout, o cartão é processado pela conta de cartão da sua loja: tokenizado no navegador ou com 3DS, sem nada a fazer do seu lado.
+  No checkout, o cartão é processado pela Zendry, com a confirmação 3DS do banco quando ele pedir, sem nada a fazer do seu lado.
 </Tip>
