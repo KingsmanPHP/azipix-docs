@@ -265,6 +265,10 @@ app.post("/seu-servidor/pagar", async (req, res) => {
 
 <ParamField body="description" type="string">Descrição do pedido (até 200 caracteres).</ParamField>
 
+<ParamField body="utms" type="object">
+  Opcional. Parâmetros de rastreamento (`utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `src`, `sck`), enviados à sua conta [UTMify](/integrations/utmify) quando o pagamento é aprovado. Mesmas regras de [Criar Cobrança Pix](/api-reference/charges/create-pix).
+</ParamField>
+
 <ParamField body="subaccountId" type="string">Registra a venda numa [subconta](/api-reference/account/subaccounts) sua.</ParamField>
 
 <ParamField header="X-Idempotency-Key" type="string">Valor único por tentativa. Veja [Idempotência](/idempotency).</ParamField>

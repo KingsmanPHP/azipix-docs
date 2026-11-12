@@ -54,6 +54,7 @@ curl https://api.azipix.com/api/transactions/tx_8F3A1C9B2D7E4F60 \
 <ResponseField name="cardBrand" type="string">Bandeira do cartão (cobranças de cartão).</ResponseField>
 <ResponseField name="cardLastFour" type="string">4 últimos dígitos do cartão.</ResponseField>
 <ResponseField name="pixCode" type="string">Pix Copia e Cola (cobranças Pix).</ResponseField>
+<ResponseField name="utms" type="object">UTMs enviadas na criação da cobrança. Ausente quando a cobrança foi criada sem `utms`. Veja [UTMify](/integrations/utmify).</ResponseField>
 
 ## Plano B do webhook
 

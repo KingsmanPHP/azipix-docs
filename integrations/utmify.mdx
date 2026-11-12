@@ -1,0 +1,81 @@
+---
+title: "UTMify"
+description: "Envie as UTMs na cobrança e a venda aprovada chega sozinha à sua conta UTMify."
+---
+
+A Azipix envia cada venda aprovada para a **sua** conta UTMify, com as UTMs que você informou ao criar a cobrança. Você conecta uma vez e não precisa chamar a UTMify pelo seu sistema.
+
+## 1. Conecte sua conta
+
+1. Na UTMify, crie uma credencial em **Integrações → Webhooks → Credenciais de API → Adicionar Credencial**.
+2. No painel Azipix, abra **Configurações → Conexões → UTMify → Configurar**.
+3. Cole o token, clique em **Testar conexão** e depois em **Salvar configuração**.
+
+O token fica criptografado e não é exibido de novo. Cada conta usa só o próprio token. No mesmo lugar você pausa os envios, troca o token ou desconecta.
+
+<Note>
+  A UTMify aceita o envio de teste sem informar se a credencial pertence a uma conta. Depois da primeira venda aprovada, confira se ela apareceu na aba **Resumo** do seu painel UTMify.
+</Note>
+
+## 2. Envie as UTMs na cobrança
+
+Inclua o objeto opcional `utms` em [Criar Cobrança Pix](/api-reference/charges/create-pix) ou [Criar Cobrança no Cartão](/api-reference/charges/create-card):
+
+```json
+{
+  "amountCents": 19990,
+  "paymentMethod": "pix",
+  "customer": {
+    "name": "João Silva",
+    "email": "joao@email.com",
+    "document": "52998224725"
+  },
+  "utms": {
+    "utm_source": "facebook",
+    "utm_medium": "cpc",
+    "utm_campaign": "campanha_black",
+    "utm_content": "criativo_01",
+    "utm_term": "produto",
+    "src": "origem",
+    "sck": "identificador"
+  }
+}
+```
+
+- Todos os campos são opcionais. Os aceitos são `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `src` e `sck`. Outras chaves são ignoradas.
+- Cada valor é um texto de até 500 caracteres. O que passar disso é cortado, sem recusar a cobrança.
+- `utms` precisa ser um objeto. Um texto ou uma lista no lugar dele devolve `400`.
+- Sem `utms`, a cobrança funciona exatamente como antes.
+
+As UTMs ficam guardadas na venda e voltam no campo `utms` da cobrança ([Consultar Cobrança](/api-reference/charges/get-charge)).
+
+### Links de pagamento
+
+Coloque as UTMs na URL do link. O checkout lê os parâmetros e os envia com o pagamento:
+
+```text
+https://azipix.com/pay/{slug}?utm_source=facebook&utm_medium=cpc&utm_campaign=campanha_black
+```
+
+## 3. O que é enviado, e quando
+
+| Situação | O que acontece |
+| :--- | :--- |
+| Pagamento aprovado | A venda é enviada como `paid`, com as UTMs da cobrança. |
+| Aprovado sem UTMs | A venda é enviada com os parâmetros de rastreamento em `null`. |
+| Pendente, recusado, expirado ou cancelado | Nada é enviado. |
+| Venda estornada depois de enviada | O mesmo pedido é atualizado para `refunded`. |
+| Conexão pausada ou desconectada | Nada é enviado. |
+| Venda de uma chave `sk_test_` | Vai em modo de teste: a UTMify valida e não salva. |
+
+O pedido leva o `id` da cobrança, a forma de pagamento, as datas em UTC, os dados do cliente, o produto (a `description` da cobrança ou o título do link) e os valores: total, tarifa da Azipix e líquido para você.
+
+Cada venda é enviada uma única vez, mesmo que a confirmação do pagamento chegue repetida. A aprovação do pagamento nunca espera pela UTMify.
+
+## 4. Falhas e reenvio
+
+Se a UTMify estiver fora do ar, a Azipix tenta de novo em intervalos crescentes: 1 min, 5 min, 15 min, 1 h, 3 h, 6 h, 12 h e 24 h. Depois disso o envio aparece como **Falhou** em **Configurações → Conexões → UTMify**, com o motivo e o botão **Reenviar**.
+
+<Warning>
+  A UTMify só aceita vendas criadas há até 7 dias (45 dias para estornos). Fora desse prazo o envio não é feito nem pode ser reenviado.
+</Warning>

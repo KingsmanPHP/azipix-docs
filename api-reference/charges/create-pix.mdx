@@ -32,6 +32,20 @@ Escopo exigido: `charges:write`.
   Descrição do pedido (até 200 caracteres). Aparece no seu painel.
 </ParamField>
 
+<ParamField body="utms" type="object">
+  Opcional. Parâmetros de rastreamento da venda, enviados à sua conta [UTMify](/integrations/utmify) quando o pagamento é aprovado. Sem ele, a cobrança funciona como sempre.
+  <Expandable title="propriedades">
+    <ParamField body="utm_source" type="string">Origem, ex.: `facebook`.</ParamField>
+    <ParamField body="utm_medium" type="string">Mídia, ex.: `cpc`.</ParamField>
+    <ParamField body="utm_campaign" type="string">Campanha.</ParamField>
+    <ParamField body="utm_content" type="string">Anúncio ou criativo.</ParamField>
+    <ParamField body="utm_term" type="string">Termo ou posicionamento.</ParamField>
+    <ParamField body="src" type="string">Parâmetro `src` da URL do seu checkout.</ParamField>
+    <ParamField body="sck" type="string">Parâmetro `sck` da URL do seu checkout.</ParamField>
+  </Expandable>
+  Cada valor aceita até 500 caracteres (o excedente é cortado). Chaves fora dessa lista são ignoradas.
+</ParamField>
+
 <ParamField body="subaccountId" type="string">
   ID de uma [subconta](/api-reference/account/subaccounts) sua para registrar a venda nela. Com uma chave vinculada a uma subconta, este campo é ignorado: a venda vai sempre para a subconta da chave.
 </ParamField>
@@ -105,6 +119,7 @@ curl --request POST \
 <ResponseField name="pixCode" type="string">Pix Copia e Cola.</ResponseField>
 <ResponseField name="pixQrCode" type="string">Imagem do QR Code (URL ou `data:image/png;base64,...`).</ResponseField>
 <ResponseField name="settlementDays" type="integer">Dias até o valor ficar disponível para saque, após o pagamento.</ResponseField>
+<ResponseField name="utms" type="object">As UTMs guardadas na venda. Só aparece quando você enviou `utms` na criação.</ResponseField>
 
 A resposta pode trazer outros campos informativos. Ignore os que você não usa.
 

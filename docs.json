@@ -106,6 +106,12 @@
           "webhooks/signature",
           "webhooks/events"
         ]
+      },
+      {
+        "group": "Integrações",
+        "pages": [
+          "integrations/utmify"
+        ]
       }
     ]
   }
